@@ -12,6 +12,8 @@ import org.aetherlink.runlet.api.SourceReader
 import org.aetherlink.runlet.dsl.Runlet
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class CheckpointedPipelineTest {
     @Test
@@ -41,6 +43,81 @@ class CheckpointedPipelineTest {
             assertEquals(Cursor(6), checkpoint.cursor)
         }
 
+    @Test
+    fun `checkpointed pipeline applies filter and evalMap before sink commit`() =
+        runBlocking {
+            val checkpoint = InMemoryCheckpointStore()
+            val sink = CollectingSink<String>()
+
+            Runlet("test") {
+                source(ScriptedCheckpointableSource(listOf(1, 2, 3, 4), chunkSize = 2))
+                    .checkpoint(checkpoint)
+                    .filter { it % 2 == 0 }
+                    .evalMap { "n=$it" }
+                    .sink(sink)
+            }.run()
+
+            assertEquals(listOf(listOf("n=2"), listOf("n=4")), sink.committedChunks)
+            assertEquals(Cursor(4), checkpoint.cursor)
+        }
+
+    @Test
+    fun `checkpoint is persisted after sink commit returns`() =
+        runBlocking {
+            val events = mutableListOf<String>()
+            val checkpoint = RecordingCheckpointStore(events)
+            val sink = RecordingSink<String>(events)
+
+            Runlet("test") {
+                source(ScriptedCheckpointableSource(listOf("a"), chunkSize = 1))
+                    .checkpoint(checkpoint)
+                    .sink(sink)
+            }.run()
+
+            assertEquals(
+                listOf(
+                    "write:a",
+                    "commit",
+                    "persist:1",
+                ),
+                events,
+            )
+        }
+
+    @Test
+    fun `checkpoint does not advance when sink write fails`() =
+        runBlocking {
+            val checkpoint = InMemoryCheckpointStore()
+            val sink = FailingSink<String>(failOnWrite = true)
+
+            assertFailsWith<IllegalStateException> {
+                Runlet("test") {
+                    source(ScriptedCheckpointableSource(listOf("a"), chunkSize = 1))
+                        .checkpoint(checkpoint)
+                        .sink(sink)
+                }.run()
+            }
+
+            assertNull(checkpoint.cursor)
+        }
+
+    @Test
+    fun `checkpoint does not advance when sink commit fails`() =
+        runBlocking {
+            val checkpoint = InMemoryCheckpointStore()
+            val sink = FailingSink<String>(failOnCommit = true)
+
+            assertFailsWith<IllegalStateException> {
+                Runlet("test") {
+                    source(ScriptedCheckpointableSource(listOf("a"), chunkSize = 1))
+                        .checkpoint(checkpoint)
+                        .sink(sink)
+                }.run()
+            }
+
+            assertNull(checkpoint.cursor)
+        }
+
     private class InMemoryCheckpointStore : CheckpointStore {
         var cursor: Cursor? = null
 
@@ -48,6 +125,16 @@ class CheckpointedPipelineTest {
 
         override suspend fun persist(cursor: Cursor) {
             this.cursor = cursor
+        }
+    }
+
+    private class RecordingCheckpointStore(
+        private val events: MutableList<String>,
+    ) : CheckpointStore {
+        override suspend fun load(): Cursor? = null
+
+        override suspend fun persist(cursor: Cursor) {
+            events += "persist:${cursor.value}"
         }
     }
 
@@ -62,6 +149,31 @@ class CheckpointedPipelineTest {
         override suspend fun commit() {
             pending?.let(committedChunks::add)
             pending = null
+        }
+    }
+
+    private class RecordingSink<T>(
+        private val events: MutableList<String>,
+    ) : Sink<T> {
+        override suspend fun write(chunk: Chunk<T>) {
+            events += "write:${chunk.records.joinToString(",")}"
+        }
+
+        override suspend fun commit() {
+            events += "commit"
+        }
+    }
+
+    private class FailingSink<T>(
+        private val failOnWrite: Boolean = false,
+        private val failOnCommit: Boolean = false,
+    ) : Sink<T> {
+        override suspend fun write(chunk: Chunk<T>) {
+            if (failOnWrite) error("write failed")
+        }
+
+        override suspend fun commit() {
+            if (failOnCommit) error("commit failed")
         }
     }
 
