@@ -1,0 +1,159 @@
+# Runlet
+
+Runlet is an early JVM library for small, embeddable, batch-oriented stream
+processing pipelines.
+
+It is meant for jobs that need more structure than hand-written loops or
+`Flow`, but do not justify running Flink, Kafka Streams, or Spark Streaming.
+Runlet runs inside your process: no broker, no cluster, no daemon.
+
+## Status
+
+Runlet is pre-release and the API will change.
+
+Current v0 scope:
+
+- single JVM process
+- one source, one linear pipeline, one sink
+- chunked execution with `Chunk<T>`
+- `map`, `filter`, and `evalMap`
+- bounded channels for uncheckpointed pipelines
+- serial checkpointed execution for ordered, resumable sources
+- file line source, file checkpoint store, and chunk-file sink
+- blocking adapters for Java and other blocking JVM integrations
+
+Not implemented yet:
+
+- windowing or `groupBy`
+- event-time semantics or watermarks
+- exactly-once semantics
+- distributed execution
+- built-in JSON serialization
+- Spring Boot integration
+
+For the longer design rationale and roadmap, see [docs/design.md](docs/design.md).
+
+## Install
+
+Runlet is not published yet. For now, build from source:
+
+```bash
+./gradlew check
+./gradlew jar
+```
+
+## Checkpointed File Pipeline
+
+This example reads lines from a file, keeps completed records, transforms them,
+and writes replay-safe chunk files.
+
+```kotlin
+import kotlinx.coroutines.runBlocking
+import org.aetherlink.runlet.connector.file.ChunkFileSink
+import org.aetherlink.runlet.connector.file.FileCheckpointStore
+import org.aetherlink.runlet.connector.file.FileSource
+import org.aetherlink.runlet.dsl.Runlet
+
+fun main() = runBlocking {
+    Runlet("orders") {
+        source(FileSource.lines("orders.txt", chunkSize = 1024))
+            .checkpoint(FileCheckpointStore("orders.ckpt"))
+            .filter { line -> line.contains("completed") }
+            .map { line -> line.uppercase() }
+            .sink(ChunkFileSink.lines("summaries"))
+    }.run()
+}
+```
+
+Checkpointed pipelines run one chunk at a time:
+
+```text
+read -> transform -> write -> commit -> persist cursor
+```
+
+The checkpoint cursor only advances after the sink commit returns. If `write()`
+or `commit()` fails, the checkpoint does not advance.
+
+## Typed JSON Lines
+
+Runlet does not include a JSON library yet. Use your serializer of choice and
+pass decode/encode functions explicitly:
+
+```kotlin
+val source = FileSource.jsonLines(
+    path = "orders.jsonl",
+    decode = ::decodeOrder,
+)
+
+val sink = ChunkFileSink.jsonLines(
+    directory = "summaries",
+    encode = ::encodeSummary,
+)
+```
+
+## Uncheckpointed Pipelines
+
+Uncheckpointed pipelines run stages concurrently with bounded channels between
+the source, stages, and sink.
+
+```kotlin
+import org.aetherlink.runlet.api.RunletRuntimeConfig
+
+Runlet(
+    name = "fast-path",
+    config = RunletRuntimeConfig(channelCapacity = 4),
+) {
+    source(mySource)
+        .map(::normalize)
+        .evalMap(::enrich)
+        .sink(mySink)
+}.run()
+```
+
+Checkpointed pipelines intentionally stay serial in v0 because cursor
+advancement depends on sink durability.
+
+## Blocking Adapters
+
+Java and blocking JVM integrations can implement blocking interfaces and adapt
+them into Runlet's coroutine contracts:
+
+```kotlin
+import org.aetherlink.runlet.adapter.blocking.BlockingSink
+import org.aetherlink.runlet.adapter.blocking.asSink
+import org.aetherlink.runlet.api.Chunk
+
+class ConsoleBlockingSink : BlockingSink<String> {
+    override fun write(chunk: Chunk<String>) {
+        chunk.records.forEach(::println)
+    }
+}
+
+val sink = ConsoleBlockingSink().asSink()
+```
+
+Blocking adapter calls run on `Dispatchers.IO`.
+
+## Development
+
+Run the full verification suite:
+
+```bash
+./gradlew check
+```
+
+This runs compilation, tests, and ktlint.
+
+Useful tasks:
+
+```bash
+./gradlew test
+./gradlew ktlintCheck
+./gradlew ktlintFormat
+```
+
+## Non-Goals
+
+If you need event-time correctness, exactly-once distributed processing, or
+horizontal scale, use Flink, Kafka Streams, or Spark Streaming. Runlet is for
+small, local, embeddable JVM pipelines.
