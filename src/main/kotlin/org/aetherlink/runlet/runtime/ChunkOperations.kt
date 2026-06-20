@@ -10,4 +10,4 @@ internal suspend fun Chunk<*>.applyStages(stages: List<PipelineStage>): Chunk<An
     return current
 }
 
-private fun Chunk<*>.asAnyChunk(): Chunk<Any?> = Chunk(records)
+internal fun Chunk<*>.asAnyChunk(): Chunk<Any?> = Chunk(records)

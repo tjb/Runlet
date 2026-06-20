@@ -1,5 +1,6 @@
 package org.aetherlink.runlet.dsl
 
+import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.aetherlink.runlet.api.RunnablePipeline
 import org.aetherlink.runlet.api.Sink
 import org.aetherlink.runlet.api.Source
@@ -12,6 +13,7 @@ import org.aetherlink.runlet.runtime.UncheckpointedRunnablePipeline
 class Pipeline<T> internal constructor(
     internal val source: Source<*>,
     internal val stages: List<PipelineStage> = emptyList(),
+    internal val config: RunletRuntimeConfig,
 ) {
     fun <R> map(transform: (T) -> R): Pipeline<R> = addStage(MapStage(transform))
 
@@ -19,7 +21,7 @@ class Pipeline<T> internal constructor(
 
     fun <R> evalMap(transform: suspend (T) -> R): Pipeline<R> = addStage(EvalMapStage(transform))
 
-    fun sink(sink: Sink<T>): RunnablePipeline = UncheckpointedRunnablePipeline(source, stages, sink)
+    fun sink(sink: Sink<T>): RunnablePipeline = UncheckpointedRunnablePipeline(source, stages, sink, config)
 
-    private fun <R> addStage(stage: PipelineStage): Pipeline<R> = Pipeline(source, stages + stage)
+    private fun <R> addStage(stage: PipelineStage): Pipeline<R> = Pipeline(source, stages + stage, config)
 }
