@@ -21,6 +21,7 @@ Current v0 scope:
 - serial checkpointed execution for ordered, resumable sources
 - file line source, file checkpoint store, and chunk-file sink
 - blocking adapters for Java and other blocking JVM integrations
+- Spring `SmartLifecycle` adapter
 
 Not implemented yet:
 
@@ -29,7 +30,7 @@ Not implemented yet:
 - exactly-once semantics
 - distributed execution
 - built-in JSON serialization
-- Spring Boot integration
+- Spring Boot autoconfiguration
 
 For the longer design rationale and roadmap, see [docs/design.md](docs/design.md).
 
@@ -133,6 +134,29 @@ val sink = ConsoleBlockingSink().asSink()
 ```
 
 Blocking adapter calls run on `Dispatchers.IO`.
+
+## Spring Lifecycle Adapter
+
+Spring applications can wrap a pipeline as a `SmartLifecycle` bean:
+
+```kotlin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
+import java.util.concurrent.Executors
+
+val dispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
+val scope = CoroutineScope(SupervisorJob() + dispatcher)
+
+val lifecycle = SpringPipelineLifecycle(
+    pipeline = pipeline,
+    scope = scope,
+    onFailure = { failure -> logger.error("Runlet pipeline failed", failure) },
+)
+```
+
+Spring Boot autoconfiguration is not implemented yet.
 
 ## Development
 
