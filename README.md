@@ -25,7 +25,8 @@ Current v0 scope:
 
 Modules:
 
-- `runlet-core`: core API, DSL, runtime, file connector, and blocking adapters
+- `runlet-core`: core API, DSL, runtime, and blocking adapters
+- `runlet-connector-file`: file source, file checkpoint store, and chunk-file sink
 - `runlet-adapter-spring`: optional Spring `SmartLifecycle` integration
 
 Not implemented yet:
@@ -46,6 +47,7 @@ Runlet is not published yet. For now, build from source:
 ```bash
 ./gradlew check
 ./gradlew :runlet-core:jar
+./gradlew :runlet-connector-file:jar
 ./gradlew :runlet-adapter-spring:jar
 ```
 
@@ -183,6 +185,7 @@ Useful tasks:
 ```bash
 ./gradlew test
 ./gradlew :runlet-core:test
+./gradlew :runlet-connector-file:test
 ./gradlew :runlet-adapter-spring:test
 ./gradlew ktlintCheck
 ./gradlew ktlintFormat

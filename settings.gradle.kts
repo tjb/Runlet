@@ -3,4 +3,5 @@ plugins {
 }
 rootProject.name = "Runlet"
 include("runlet-core")
+include("runlet-connector-file")
 include("runlet-adapter-spring")
