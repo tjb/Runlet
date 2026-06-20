@@ -8,7 +8,7 @@ import org.aetherlink.runlet.api.Sink
 
 internal class CheckpointedRunnablePipeline(
     private val source: CheckpointableSource<*>,
-    private val operations: List<PipelineOperation>,
+    private val stages: List<PipelineStage>,
     private val checkpointStore: CheckpointStore?,
     private val sink: Sink<*>,
 ) : RunnablePipeline {
@@ -27,7 +27,7 @@ internal class CheckpointedRunnablePipeline(
         typedSource.useReader(store.load()) {
             while (true) {
                 val sourceChunk = read() ?: break
-                val output = sourceChunk.chunk.applyOperations(operations)
+                val output = sourceChunk.chunk.applyStages(stages)
                 if (output != null) {
                     if (typedSink is CursorRangeSink) {
                         typedSink.write(output, sourceChunk.cursorRange)

@@ -6,7 +6,7 @@ import org.aetherlink.runlet.api.Source
 
 internal class UncheckpointedRunnablePipeline(
     private val source: Source<*>,
-    private val operations: List<PipelineOperation>,
+    private val stages: List<PipelineStage>,
     private val sink: Sink<*>,
 ) : RunnablePipeline {
     override suspend fun run() {
@@ -19,7 +19,7 @@ internal class UncheckpointedRunnablePipeline(
         typedSource.useReader {
             while (true) {
                 val sourceChunk = read() ?: break
-                val output = sourceChunk.applyOperations(operations) ?: continue
+                val output = sourceChunk.applyStages(stages) ?: continue
                 typedSink.write(output)
                 typedSink.commit()
             }

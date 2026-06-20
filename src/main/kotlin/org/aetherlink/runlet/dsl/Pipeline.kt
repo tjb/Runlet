@@ -1,26 +1,25 @@
 package org.aetherlink.runlet.dsl
 
-import org.aetherlink.runlet.api.Chunk
 import org.aetherlink.runlet.api.RunnablePipeline
 import org.aetherlink.runlet.api.Sink
 import org.aetherlink.runlet.api.Source
-import org.aetherlink.runlet.runtime.PipelineOperation
+import org.aetherlink.runlet.runtime.EvalMapStage
+import org.aetherlink.runlet.runtime.FilterStage
+import org.aetherlink.runlet.runtime.MapStage
+import org.aetherlink.runlet.runtime.PipelineStage
 import org.aetherlink.runlet.runtime.UncheckpointedRunnablePipeline
 
 class Pipeline<T> internal constructor(
     internal val source: Source<*>,
-    internal val operations: List<PipelineOperation> = emptyList(),
+    internal val stages: List<PipelineStage> = emptyList(),
 ) {
-    fun <R> map(transform: (T) -> R): Pipeline<R> = addOperation { chunk -> chunk.map { transform(it as T) } }
+    fun <R> map(transform: (T) -> R): Pipeline<R> = addStage(MapStage(transform))
 
-    fun filter(predicate: (T) -> Boolean): Pipeline<T> = addOperation { chunk -> chunk.filter { predicate(it as T) } }
+    fun filter(predicate: (T) -> Boolean): Pipeline<T> = addStage(FilterStage(predicate))
 
-    fun <R> evalMap(transform: suspend (T) -> R): Pipeline<R> =
-        addOperation { chunk ->
-            Chunk(chunk.records.map { transform(it as T) })
-        }
+    fun <R> evalMap(transform: suspend (T) -> R): Pipeline<R> = addStage(EvalMapStage(transform))
 
-    fun sink(sink: Sink<T>): RunnablePipeline = UncheckpointedRunnablePipeline(source, operations, sink)
+    fun sink(sink: Sink<T>): RunnablePipeline = UncheckpointedRunnablePipeline(source, stages, sink)
 
-    private fun <R> addOperation(operation: PipelineOperation): Pipeline<R> = Pipeline(source, operations + operation)
+    private fun <R> addStage(stage: PipelineStage): Pipeline<R> = Pipeline(source, stages + stage)
 }
