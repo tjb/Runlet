@@ -9,22 +9,17 @@ import org.aetherlink.runlet.api.Sink
 internal class CheckpointedRunnablePipeline(
     private val source: CheckpointableSource<*>,
     private val stages: List<PipelineStage>,
-    private val checkpointStore: CheckpointStore?,
+    private val checkpointStore: CheckpointStore,
     private val sink: Sink<*>,
 ) : RunnablePipeline {
     override suspend fun run() {
-        val store =
-            requireNotNull(checkpointStore) {
-                "Checkpointable pipelines must call checkpoint(store) before sink(...)"
-            }
-
         @Suppress("UNCHECKED_CAST")
         val typedSource = source as CheckpointableSource<Any?>
 
         @Suppress("UNCHECKED_CAST")
         val typedSink = sink as Sink<Any?>
 
-        typedSource.useReader(store.load()) {
+        typedSource.useReader(checkpointStore.load()) {
             while (true) {
                 val sourceChunk = read() ?: break
                 val output = sourceChunk.chunk.applyStages(stages)
@@ -36,7 +31,7 @@ internal class CheckpointedRunnablePipeline(
                     }
                     typedSink.commit()
                 }
-                store.persist(sourceChunk.cursorRange.next)
+                checkpointStore.persist(sourceChunk.cursorRange.next)
             }
         }
     }

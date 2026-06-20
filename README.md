@@ -81,6 +81,10 @@ read -> transform -> write -> commit -> persist cursor
 The checkpoint cursor only advances after the sink commit returns. If `write()`
 or `commit()` fails, the checkpoint does not advance.
 
+For checkpointable sources, `.sink(...)` is only available after
+`.checkpoint(...)` has been called. That is enforced by the DSL types rather
+than a runtime capability check.
+
 ## Typed JSON Lines
 
 Runlet does not include a JSON library yet. Use your serializer of choice and
