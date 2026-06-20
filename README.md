@@ -23,6 +23,11 @@ Current v0 scope:
 - blocking adapters for Java and other blocking JVM integrations
 - Spring `SmartLifecycle` adapter
 
+Modules:
+
+- `runlet-core`: core API, DSL, runtime, file connector, and blocking adapters
+- `runlet-adapter-spring`: optional Spring `SmartLifecycle` integration
+
 Not implemented yet:
 
 - windowing or `groupBy`
@@ -40,7 +45,8 @@ Runlet is not published yet. For now, build from source:
 
 ```bash
 ./gradlew check
-./gradlew jar
+./gradlew :runlet-core:jar
+./gradlew :runlet-adapter-spring:jar
 ```
 
 ## Checkpointed File Pipeline
@@ -172,6 +178,8 @@ Useful tasks:
 
 ```bash
 ./gradlew test
+./gradlew :runlet-core:test
+./gradlew :runlet-adapter-spring:test
 ./gradlew ktlintCheck
 ./gradlew ktlintFormat
 ```

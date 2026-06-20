@@ -1,30 +1,27 @@
 plugins {
-    kotlin("jvm") version "2.3.21"
-    `java-library`
-    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
+    kotlin("jvm") version "2.3.21" apply false
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0" apply false
 }
 
-group = "org.aetherlink"
-version = "1.0-SNAPSHOT"
+allprojects {
+    group = "org.aetherlink"
+    version = "1.0-SNAPSHOT"
 
-repositories {
-    mavenCentral()
+    repositories {
+        mavenCentral()
+    }
 }
 
-dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+subprojects {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "java-library")
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
 
-    compileOnly("org.springframework:spring-context:7.0.0")
+    extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension>("kotlin") {
+        jvmToolchain(25)
+    }
 
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("org.springframework:spring-context:7.0.0")
-}
-
-kotlin {
-    jvmToolchain(25)
-}
-
-tasks.test {
-    useJUnitPlatform()
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+    }
 }
