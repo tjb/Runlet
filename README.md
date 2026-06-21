@@ -170,6 +170,19 @@ Operationally, treat Runlet like an embedded job runner:
   the same pipeline against the same input/checkpoint, use an external lock or
   run only one active instance.
 
+Strong production shapes for Runlet:
+
+| Shape | Source | Sink | Checkpoint |
+| --- | --- | --- | --- |
+| Database backfill | Ordered primary-key scan | Table/index upsert | Last processed primary key |
+| Object storage JSONL import | Object manifest or JSONL object | Database or clean output prefix | Object key plus byte offset |
+| API cursor poller | Paginated API cursor | Durable storage | API cursor or page token |
+| Search index backfill | Database or object storage | Elasticsearch/OpenSearch bulk index | Last primary key or object offset after successful bulk index |
+
+These shapes describe where the model fits. Today, only file and Jackson JSONL
+connectors are implemented; database, object storage, API, and search
+connectors would live in separate optional modules.
+
 ## Spring Boot
 
 Spring Boot applications can register Runlet pipelines as beans. The starter
