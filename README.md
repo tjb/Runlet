@@ -31,7 +31,6 @@ Not implemented yet:
 - event-time semantics or watermarks
 - exactly-once semantics
 - distributed execution
-- built-in JSON serialization
 - Actuator metrics integration
 
 ## Modules
@@ -40,6 +39,7 @@ Not implemented yet:
 | --- | --- |
 | `runlet-core` | Core API, DSL, runtime, and blocking adapters. |
 | `runlet-connector-file` | File source, file checkpoint store, and chunk-file sink. |
+| `runlet-connector-jackson` | Jackson-backed JSON Lines source and sink helpers. |
 | `runlet-adapter-spring` | Spring Framework `SmartLifecycle` integration. |
 | `runlet-spring-boot-autoconfigure` | Spring Boot autoconfiguration. |
 | `runlet-spring-boot-starter` | Convenience dependency for Spring Boot applications. |
@@ -65,6 +65,7 @@ repositories {
 dependencies {
     implementation("org.aetherlink:runlet-core:1.0-SNAPSHOT")
     implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-connector-jackson:1.0-SNAPSHOT")
 }
 ```
 
@@ -74,6 +75,7 @@ For Spring Boot applications, prefer the starter:
 dependencies {
     implementation("org.aetherlink:runlet-spring-boot-starter:1.0-SNAPSHOT")
     implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-connector-jackson:1.0-SNAPSHOT")
 }
 ```
 
@@ -189,8 +191,8 @@ advancement depends on sink durability.
 
 ## JSON Lines
 
-Runlet does not include a JSON library. Use your serializer of choice and pass
-decode/encode functions explicitly:
+The file connector supports serializer-agnostic JSON Lines by accepting
+decode/encode functions:
 
 ```kotlin
 val source = FileSource.jsonLines(
@@ -202,6 +204,16 @@ val sink = ChunkFileSink.jsonLines(
     directory = "summaries",
     encode = ::encodeSummary,
 )
+```
+
+For Jackson, add `runlet-connector-jackson` and use the Jackson factories:
+
+```kotlin
+import org.aetherlink.runlet.connector.jackson.JacksonChunkFileSink
+import org.aetherlink.runlet.connector.jackson.JacksonFileSource
+
+val source = JacksonFileSource.jsonLines<Order>("orders.jsonl")
+val sink = JacksonChunkFileSink.jsonLines<OrderSummary>("summaries")
 ```
 
 ## Blocking Adapters
