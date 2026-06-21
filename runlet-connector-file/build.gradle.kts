@@ -1,3 +1,5 @@
+description = "File source, file checkpoint store, and chunk-file sink for Runlet."
+
 dependencies {
     api(project(":runlet-core"))
 

@@ -45,13 +45,24 @@ For more detail:
 
 ## Install
 
-Runlet is not published yet. For now, build from source:
+Runlet is not published yet. Intended coordinates:
+
+```kotlin
+dependencies {
+    implementation("org.aetherlink:runlet-core:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-adapter-spring:1.0-SNAPSHOT")
+}
+```
+
+For now, build from source:
 
 ```bash
 ./gradlew check
 ./gradlew :runlet-core:jar
 ./gradlew :runlet-connector-file:jar
 ./gradlew :runlet-adapter-spring:jar
+./gradlew publishToMavenLocal
 ```
 
 ## Checkpointed File Pipeline

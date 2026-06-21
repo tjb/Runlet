@@ -1,3 +1,5 @@
+description = "Core API, DSL, runtime, and blocking adapters for Runlet."
+
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
