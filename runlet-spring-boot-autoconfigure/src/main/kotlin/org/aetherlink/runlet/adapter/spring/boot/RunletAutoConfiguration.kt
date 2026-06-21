@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
+import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -31,6 +32,13 @@ class RunletAutoConfiguration {
     @Bean(name = ["runletScope"])
     @ConditionalOnMissingBean(name = ["runletScope"])
     fun runletScope(runletDispatcher: ExecutorCoroutineDispatcher): CoroutineScope = CoroutineScope(SupervisorJob() + runletDispatcher)
+
+    @Bean
+    @ConditionalOnMissingBean
+    fun runletRuntimeConfig(properties: RunletProperties): RunletRuntimeConfig =
+        RunletRuntimeConfig(
+            channelCapacity = properties.runtime.channelCapacity,
+        )
 
     @Bean
     fun runletPipelineLifecycleFactory(

@@ -194,6 +194,7 @@ beans. Runlet creates a shared coroutine scope, wraps each registration in a
 
 ```kotlin
 import org.aetherlink.runlet.adapter.spring.boot.RunletPipelineRegistration
+import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.aetherlink.runlet.dsl.Runlet
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -201,9 +202,9 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class PipelineConfiguration {
     @Bean
-    fun ordersPipeline(): RunletPipelineRegistration =
+    fun ordersPipeline(runletRuntimeConfig: RunletRuntimeConfig): RunletPipelineRegistration =
         RunletPipelineRegistration("orders") {
-            Runlet("orders") {
+            Runlet("orders", config = runletRuntimeConfig) {
                 source(orderSource)
                     .checkpoint(orderCheckpointStore)
                     .map(::summarize)
@@ -219,7 +220,11 @@ Useful properties:
 runlet.enabled=true
 runlet.threads=4
 runlet.shutdown-timeout=30s
+runlet.runtime.channel-capacity=4
 ```
+
+Connector-specific settings, such as `FileSource.lines(..., chunkSize = 1024)`,
+are still chosen when constructing that source.
 
 ## Development
 

@@ -8,6 +8,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
+import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.aetherlink.runlet.api.RunnablePipeline
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -36,13 +37,41 @@ class RunletAutoConfigurationTest {
             assertTrue(context.containsBean("runletScope"))
             assertNotNull(context.getBean(RunletPipelineRegistry::class.java))
             assertNotNull(context.getBean(RunletPipelineManager::class.java))
+            assertEquals(4, context.getBean(RunletRuntimeConfig::class.java).channelCapacity)
         }
+    }
+
+    @Test
+    fun `runtime config is bound from properties`() {
+        contextRunner
+            .withPropertyValues("runlet.runtime.channel-capacity=12")
+            .run { context ->
+                assertEquals(12, context.getBean(RunletRuntimeConfig::class.java).channelCapacity)
+            }
+    }
+
+    @Test
+    fun `user provided runtime config is used`() {
+        contextRunner
+            .withBean(RunletRuntimeConfig::class.java, Supplier { RunletRuntimeConfig(channelCapacity = 99) })
+            .run { context ->
+                assertEquals(99, context.getBean(RunletRuntimeConfig::class.java).channelCapacity)
+            }
     }
 
     @Test
     fun `invalid thread count is rejected`() {
         contextRunner
             .withPropertyValues("runlet.threads=0")
+            .run { context ->
+                assertNotNull(context.startupFailure)
+            }
+    }
+
+    @Test
+    fun `invalid channel capacity is rejected`() {
+        contextRunner
+            .withPropertyValues("runlet.runtime.channel-capacity=0")
             .run { context ->
                 assertNotNull(context.startupFailure)
             }
