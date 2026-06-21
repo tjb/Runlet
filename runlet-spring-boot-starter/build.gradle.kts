@@ -6,4 +6,5 @@ dependencies {
     api(project(":runlet-spring-boot-autoconfigure"))
 
     api("org.springframework.boot:spring-boot-starter:4.0.0")
+    api("org.springframework.boot:spring-boot-health:4.0.0")
 }

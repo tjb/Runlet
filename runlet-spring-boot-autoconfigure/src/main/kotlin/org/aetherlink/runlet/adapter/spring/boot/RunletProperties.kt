@@ -18,7 +18,13 @@ class RunletProperties {
 
     var shutdownTimeout: Duration = Duration.ofSeconds(30)
 
+    var health: Health = Health()
+
     var runtime: Runtime = Runtime()
+
+    class Health {
+        var enabled: Boolean = true
+    }
 
     class Runtime {
         /**

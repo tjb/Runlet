@@ -32,7 +32,7 @@ Not implemented yet:
 - exactly-once semantics
 - distributed execution
 - built-in JSON serialization
-- Actuator health or metrics integration
+- Actuator metrics integration
 
 ## Modules
 
@@ -148,12 +148,18 @@ runlet:
   enabled: true
   threads: 4
   shutdown-timeout: 30s
+  health:
+    enabled: true
   runtime:
     channel-capacity: 4
 ```
 
 Connector-specific settings, such as `FileSource.lines(..., chunkSize = 1024)`,
 are still chosen when constructing that source.
+
+When Spring Boot's health module is on the classpath, Runlet contributes a
+`runletHealthIndicator`. It reports `UP` when registered pipelines have no
+recorded failure and `DOWN` when one or more pipelines fail.
 
 ## Runtime Model
 

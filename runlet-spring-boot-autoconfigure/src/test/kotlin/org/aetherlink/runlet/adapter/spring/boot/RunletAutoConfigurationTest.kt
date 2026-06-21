@@ -11,6 +11,9 @@ import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
 import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.aetherlink.runlet.api.RunnablePipeline
 import org.springframework.boot.autoconfigure.AutoConfigurations
+import org.springframework.boot.health.contributor.Health
+import org.springframework.boot.health.contributor.HealthIndicator
+import org.springframework.boot.health.contributor.Status
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import java.util.concurrent.Executors
 import java.util.function.Supplier
@@ -27,6 +30,7 @@ class RunletAutoConfigurationTest {
             .withConfiguration(
                 AutoConfigurations.of(
                     RunletAutoConfiguration::class.java,
+                    RunletHealthAutoConfiguration::class.java,
                 ),
             )
 
@@ -37,6 +41,7 @@ class RunletAutoConfigurationTest {
             assertTrue(context.containsBean("runletScope"))
             assertNotNull(context.getBean(RunletPipelineRegistry::class.java))
             assertNotNull(context.getBean(RunletPipelineManager::class.java))
+            assertNotNull(context.getBean("runletHealthIndicator", HealthIndicator::class.java))
             assertEquals(4, context.getBean(RunletRuntimeConfig::class.java).channelCapacity)
         }
     }
@@ -96,6 +101,27 @@ class RunletAutoConfigurationTest {
             .run { context ->
                 assertFalse(context.containsBean("runletDispatcher"))
                 assertFalse(context.containsBean("runletScope"))
+                assertFalse(context.containsBean("runletHealthIndicator"))
+            }
+    }
+
+    @Test
+    fun `health indicator backs off when disabled`() {
+        contextRunner
+            .withPropertyValues("runlet.health.enabled=false")
+            .run { context ->
+                assertFalse(context.containsBean("runletHealthIndicator"))
+            }
+    }
+
+    @Test
+    fun `user provided health indicator is used`() {
+        val customHealthIndicator = HealthIndicator { Health.status("CUSTOM").build() }
+
+        contextRunner
+            .withBean("runletHealthIndicator", HealthIndicator::class.java, Supplier { customHealthIndicator })
+            .run { context ->
+                assertEquals(customHealthIndicator, context.getBean("runletHealthIndicator", HealthIndicator::class.java))
             }
     }
 
@@ -161,6 +187,46 @@ class RunletAutoConfigurationTest {
 
             awaitUntil { registry.failures().isNotEmpty() }
             assertEquals(failure, registry.failures()["orders"])
+        }
+    }
+
+    @Test
+    fun `health indicator reports up when registered pipelines have not failed`() {
+        val runner =
+            contextRunner.withBean(
+                RunletPipelineRegistration::class.java,
+                Supplier {
+                    RunletPipelineRegistration("orders") { BlockingPipeline() }
+                },
+            )
+
+        runner.run { context ->
+            val health = assertNotNull(context.getBean("runletHealthIndicator", HealthIndicator::class.java).health())
+
+            assertEquals(Status.UP, health.status)
+            assertEquals(setOf("orders"), health.details["pipelines"])
+        }
+    }
+
+    @Test
+    fun `health indicator reports down when a pipeline fails`() {
+        val failure = IllegalStateException("pipeline failed")
+        val runner =
+            contextRunner.withBean(
+                RunletPipelineRegistration::class.java,
+                Supplier {
+                    RunletPipelineRegistration("orders") { FailingPipeline(failure) }
+                },
+            )
+
+        runner.run { context ->
+            val healthIndicator = context.getBean("runletHealthIndicator", HealthIndicator::class.java)
+
+            awaitUntil { healthIndicator.health()?.status == Status.DOWN }
+
+            val health = assertNotNull(healthIndicator.health())
+            assertEquals(Status.DOWN, health.status)
+            assertEquals(mapOf("orders" to "pipeline failed"), health.details["failures"])
         }
     }
 

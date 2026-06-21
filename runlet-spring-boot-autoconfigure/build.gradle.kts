@@ -7,7 +7,10 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
+    compileOnly("org.springframework.boot:spring-boot-health:4.0.0")
+
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.springframework.boot:spring-boot-health:4.0.0")
     testImplementation("org.springframework.boot:spring-boot-starter-test:4.0.0")
 }
