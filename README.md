@@ -1,4 +1,8 @@
-# Runlet
+<p align="center">
+  <img src="docs/assets/runlet-mark.svg" alt="Runlet logo" width="96" height="96">
+</p>
+
+<h1 align="center">Runlet</h1>
 
 Runlet is a small JVM library for embeddable, batch-oriented stream processing
 pipelines.
