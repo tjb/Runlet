@@ -1,15 +1,16 @@
 # Runlet
 
-Runlet is an early JVM library for small, embeddable, batch-oriented stream
-processing pipelines.
+Runlet is a small JVM library for embeddable, batch-oriented stream processing
+pipelines.
 
-It is meant for jobs that need more structure than hand-written loops or
-`Flow`, but do not justify running Flink, Kafka Streams, or Spark Streaming.
-Runlet runs inside your process: no broker, no cluster, no daemon.
+It is for jobs that need more structure than hand-written loops or `Flow`, but
+do not justify operating Flink, Kafka Streams, or Spark Streaming. Runlet runs
+inside your process: no broker, no cluster, no daemon.
 
 ## Status
 
-Runlet is pre-release and the API will change.
+Runlet is pre-release. APIs, module names, and behavior may change before a
+stable release.
 
 Current v0 scope:
 
@@ -24,14 +25,6 @@ Current v0 scope:
 - Spring `SmartLifecycle` adapter
 - Spring Boot starter and autoconfiguration
 
-Modules:
-
-- `runlet-core`: core API, DSL, runtime, and blocking adapters
-- `runlet-connector-file`: file source, file checkpoint store, and chunk-file sink
-- `runlet-adapter-spring`: optional Spring `SmartLifecycle` integration
-- `runlet-spring-boot-autoconfigure`: Spring Boot autoconfiguration
-- `runlet-spring-boot-starter`: Spring Boot starter dependency
-
 Not implemented yet:
 
 - windowing or `groupBy`
@@ -39,40 +32,55 @@ Not implemented yet:
 - exactly-once semantics
 - distributed execution
 - built-in JSON serialization
+- Actuator health or metrics integration
 
-For more detail:
+## Modules
 
-- [Design notes](docs/design.md)
-- [Failure semantics](docs/failure-semantics.md)
+| Module | Purpose |
+| --- | --- |
+| `runlet-core` | Core API, DSL, runtime, and blocking adapters. |
+| `runlet-connector-file` | File source, file checkpoint store, and chunk-file sink. |
+| `runlet-adapter-spring` | Spring Framework `SmartLifecycle` integration. |
+| `runlet-spring-boot-autoconfigure` | Spring Boot autoconfiguration. |
+| `runlet-spring-boot-starter` | Convenience dependency for Spring Boot applications. |
 
 ## Install
 
-Runlet is not published yet. Intended coordinates:
-
-```kotlin
-dependencies {
-    implementation("org.aetherlink:runlet-core:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-adapter-spring:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-spring-boot-starter:1.0-SNAPSHOT")
-}
-```
-
-For now, build from source:
+Runlet is not published to a remote Maven repository yet. For local use, publish
+the artifacts to your Maven local repository:
 
 ```bash
 ./gradlew check
-./gradlew :runlet-core:jar
-./gradlew :runlet-connector-file:jar
-./gradlew :runlet-adapter-spring:jar
-./gradlew :runlet-spring-boot-starter:jar
 ./gradlew publishToMavenLocal
 ```
 
-## Checkpointed File Pipeline
+Then add `mavenLocal()` and the modules you need:
 
-This example reads lines from a file, keeps completed records, transforms them,
-and writes replay-safe chunk files.
+```kotlin
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.aetherlink:runlet-core:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
+}
+```
+
+For Spring Boot applications, prefer the starter:
+
+```kotlin
+dependencies {
+    implementation("org.aetherlink:runlet-spring-boot-starter:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
+}
+```
+
+## Quick Start
+
+This checkpointed file pipeline reads lines from a file, keeps completed
+records, transforms them, and writes replay-safe chunk files.
 
 ```kotlin
 import kotlinx.coroutines.runBlocking
@@ -102,95 +110,14 @@ The checkpoint cursor only advances after the sink commit returns. If `write()`
 or `commit()` fails, the checkpoint does not advance.
 
 For checkpointable sources, `.sink(...)` is only available after
-`.checkpoint(...)` has been called. That is enforced by the DSL types rather
-than a runtime capability check.
+`.checkpoint(...)` has been called. The DSL enforces this with types rather than
+a runtime capability check.
 
-## Typed JSON Lines
+## Spring Boot
 
-Runlet does not include a JSON library yet. Use your serializer of choice and
-pass decode/encode functions explicitly:
-
-```kotlin
-val source = FileSource.jsonLines(
-    path = "orders.jsonl",
-    decode = ::decodeOrder,
-)
-
-val sink = ChunkFileSink.jsonLines(
-    directory = "summaries",
-    encode = ::encodeSummary,
-)
-```
-
-## Uncheckpointed Pipelines
-
-Uncheckpointed pipelines run stages concurrently with bounded channels between
-the source, stages, and sink.
-
-```kotlin
-import org.aetherlink.runlet.api.RunletRuntimeConfig
-
-Runlet(
-    name = "fast-path",
-    config = RunletRuntimeConfig(channelCapacity = 4),
-) {
-    source(mySource)
-        .map(::normalize)
-        .evalMap(::enrich)
-        .sink(mySink)
-}.run()
-```
-
-Checkpointed pipelines intentionally stay serial in v0 because cursor
-advancement depends on sink durability.
-
-## Blocking Adapters
-
-Java and blocking JVM integrations can implement blocking interfaces and adapt
-them into Runlet's coroutine contracts:
-
-```kotlin
-import org.aetherlink.runlet.adapter.blocking.BlockingSink
-import org.aetherlink.runlet.adapter.blocking.asSink
-import org.aetherlink.runlet.api.Chunk
-
-class ConsoleBlockingSink : BlockingSink<String> {
-    override fun write(chunk: Chunk<String>) {
-        chunk.records.forEach(::println)
-    }
-}
-
-val sink = ConsoleBlockingSink().asSink()
-```
-
-Blocking adapter calls run on `Dispatchers.IO`.
-
-## Spring Lifecycle Adapter
-
-Spring applications can wrap a pipeline as a `SmartLifecycle` bean:
-
-```kotlin
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
-import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
-import java.util.concurrent.Executors
-
-val dispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
-val scope = CoroutineScope(SupervisorJob() + dispatcher)
-
-val lifecycle = SpringPipelineLifecycle(
-    pipeline = pipeline,
-    scope = scope,
-    onFailure = { failure -> logger.error("Runlet pipeline failed", failure) },
-)
-```
-
-## Spring Boot Starter
-
-Spring Boot applications can depend on the starter and register pipelines as
-beans. Runlet creates a shared coroutine scope, wraps each registration in a
-`SmartLifecycle`, and starts/stops them with the application context.
+Spring Boot applications can register Runlet pipelines as beans. The starter
+creates a shared coroutine scope, wraps each registration in a `SmartLifecycle`,
+and starts/stops pipelines with the application context.
 
 ```kotlin
 import org.aetherlink.runlet.adapter.spring.boot.RunletPipelineRegistration
@@ -214,17 +141,105 @@ class PipelineConfiguration {
 }
 ```
 
-Useful properties:
+`application.yml`:
 
-```properties
-runlet.enabled=true
-runlet.threads=4
-runlet.shutdown-timeout=30s
-runlet.runtime.channel-capacity=4
+```yaml
+runlet:
+  enabled: true
+  threads: 4
+  shutdown-timeout: 30s
+  runtime:
+    channel-capacity: 4
 ```
 
 Connector-specific settings, such as `FileSource.lines(..., chunkSize = 1024)`,
 are still chosen when constructing that source.
+
+## Runtime Model
+
+Runlet moves records through a pipeline as chunks, not one record at a time.
+Stages still use ordinary per-record functions, but the runtime batches the
+plumbing around them.
+
+Uncheckpointed pipelines run stages concurrently with bounded channels between
+the source, stages, and sink:
+
+```kotlin
+import org.aetherlink.runlet.api.RunletRuntimeConfig
+
+Runlet(
+    name = "fast-path",
+    config = RunletRuntimeConfig(channelCapacity = 4),
+) {
+    source(mySource)
+        .map(::normalize)
+        .evalMap(::enrich)
+        .sink(mySink)
+}.run()
+```
+
+Checkpointed pipelines intentionally stay serial in v0 because cursor
+advancement depends on sink durability.
+
+## JSON Lines
+
+Runlet does not include a JSON library. Use your serializer of choice and pass
+decode/encode functions explicitly:
+
+```kotlin
+val source = FileSource.jsonLines(
+    path = "orders.jsonl",
+    decode = ::decodeOrder,
+)
+
+val sink = ChunkFileSink.jsonLines(
+    directory = "summaries",
+    encode = ::encodeSummary,
+)
+```
+
+## Blocking Adapters
+
+Java and blocking JVM integrations can implement blocking interfaces and adapt
+them into Runlet's coroutine contracts:
+
+```kotlin
+import org.aetherlink.runlet.adapter.blocking.BlockingSink
+import org.aetherlink.runlet.adapter.blocking.asSink
+import org.aetherlink.runlet.api.Chunk
+
+class ConsoleBlockingSink : BlockingSink<String> {
+    override fun write(chunk: Chunk<String>) {
+        chunk.records.forEach(::println)
+    }
+}
+
+val sink = ConsoleBlockingSink().asSink()
+```
+
+Blocking adapter calls run on `Dispatchers.IO`.
+
+## Spring Framework
+
+Applications that use Spring Framework without Spring Boot can wrap a pipeline
+as a `SmartLifecycle` bean:
+
+```kotlin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
+import java.util.concurrent.Executors
+
+val dispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
+val scope = CoroutineScope(SupervisorJob() + dispatcher)
+
+val lifecycle = SpringPipelineLifecycle(
+    pipeline = pipeline,
+    scope = scope,
+    onFailure = { failure -> logger.error("Runlet pipeline failed", failure) },
+)
+```
 
 ## Development
 
@@ -240,12 +255,15 @@ Useful tasks:
 
 ```bash
 ./gradlew test
-./gradlew :runlet-core:test
-./gradlew :runlet-connector-file:test
-./gradlew :runlet-adapter-spring:test
 ./gradlew ktlintCheck
 ./gradlew ktlintFormat
+./gradlew publishToMavenLocal
 ```
+
+## Design Notes
+
+- [Design notes](docs/design.md)
+- [Failure semantics](docs/failure-semantics.md)
 
 ## Non-Goals
 
