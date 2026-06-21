@@ -38,7 +38,10 @@ Not implemented yet:
 - built-in JSON serialization
 - Spring Boot autoconfiguration
 
-For the longer design rationale and roadmap, see [docs/design.md](docs/design.md).
+For more detail:
+
+- [Design notes](docs/design.md)
+- [Failure semantics](docs/failure-semantics.md)
 
 ## Install
 
