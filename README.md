@@ -115,6 +115,61 @@ For checkpointable sources, `.sink(...)` is only available after
 `.checkpoint(...)` has been called. The DSL enforces this with types rather than
 a runtime capability check.
 
+## Real-World Usage
+
+Runlet is useful for local or embedded jobs where the input has an ordered
+cursor and replay is acceptable. A common shape is:
+
+```text
+source file/API export -> validate/filter -> transform -> durable sink
+```
+
+For example, a service can process a partner-provided JSON Lines export at
+startup or on a schedule:
+
+```kotlin
+import kotlinx.coroutines.runBlocking
+import org.aetherlink.runlet.connector.file.FileCheckpointStore
+import org.aetherlink.runlet.connector.jackson.JacksonChunkFileSink
+import org.aetherlink.runlet.connector.jackson.JacksonFileSource
+import org.aetherlink.runlet.dsl.Runlet
+
+data class PartnerOrder(
+    val id: String,
+    val status: String,
+    val totalCents: Long,
+)
+
+data class OrderSummary(
+    val id: String,
+    val totalCents: Long,
+)
+
+fun main() = runBlocking {
+    Runlet("partner-orders") {
+        source(JacksonFileSource.jsonLines<PartnerOrder>("imports/orders.jsonl"))
+            .checkpoint(FileCheckpointStore("state/partner-orders.ckpt"))
+            .filter { order -> order.status == "completed" }
+            .map { order -> OrderSummary(order.id, order.totalCents) }
+            .sink(JacksonChunkFileSink.jsonLines("exports/order-summaries"))
+    }.run()
+}
+```
+
+Operationally, treat Runlet like an embedded job runner:
+
+- Put checkpoint files on durable storage if resumability matters.
+- Make checkpointed sinks replay-safe. A failed chunk may be written again
+  because Runlet advances the checkpoint only after `commit()` succeeds.
+- Keep `chunkSize` large enough to amortize overhead, but small enough that a
+  replayed chunk is acceptable.
+- Use Spring Boot lifecycle integration for long-running application pipelines.
+- Watch the `runletHealthIndicator` in Spring Boot apps; a failed pipeline is
+  reported as `DOWN`.
+- Keep distributed coordination outside Runlet. If several app instances run
+  the same pipeline against the same input/checkpoint, use an external lock or
+  run only one active instance.
+
 ## Spring Boot
 
 Spring Boot applications can register Runlet pipelines as beans. The starter
