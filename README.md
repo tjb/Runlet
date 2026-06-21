@@ -22,12 +22,15 @@ Current v0 scope:
 - file line source, file checkpoint store, and chunk-file sink
 - blocking adapters for Java and other blocking JVM integrations
 - Spring `SmartLifecycle` adapter
+- Spring Boot starter and autoconfiguration
 
 Modules:
 
 - `runlet-core`: core API, DSL, runtime, and blocking adapters
 - `runlet-connector-file`: file source, file checkpoint store, and chunk-file sink
 - `runlet-adapter-spring`: optional Spring `SmartLifecycle` integration
+- `runlet-spring-boot-autoconfigure`: Spring Boot autoconfiguration
+- `runlet-spring-boot-starter`: Spring Boot starter dependency
 
 Not implemented yet:
 
@@ -36,7 +39,6 @@ Not implemented yet:
 - exactly-once semantics
 - distributed execution
 - built-in JSON serialization
-- Spring Boot autoconfiguration
 
 For more detail:
 
@@ -52,6 +54,7 @@ dependencies {
     implementation("org.aetherlink:runlet-core:1.0-SNAPSHOT")
     implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
     implementation("org.aetherlink:runlet-adapter-spring:1.0-SNAPSHOT")
+    implementation("org.aetherlink:runlet-spring-boot-starter:1.0-SNAPSHOT")
 }
 ```
 
@@ -62,6 +65,7 @@ For now, build from source:
 ./gradlew :runlet-core:jar
 ./gradlew :runlet-connector-file:jar
 ./gradlew :runlet-adapter-spring:jar
+./gradlew :runlet-spring-boot-starter:jar
 ./gradlew publishToMavenLocal
 ```
 
@@ -182,7 +186,40 @@ val lifecycle = SpringPipelineLifecycle(
 )
 ```
 
-Spring Boot autoconfiguration is not implemented yet.
+## Spring Boot Starter
+
+Spring Boot applications can depend on the starter and register pipelines as
+beans. Runlet creates a shared coroutine scope, wraps each registration in a
+`SmartLifecycle`, and starts/stops them with the application context.
+
+```kotlin
+import org.aetherlink.runlet.adapter.spring.boot.RunletPipelineRegistration
+import org.aetherlink.runlet.dsl.Runlet
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+
+@Configuration
+class PipelineConfiguration {
+    @Bean
+    fun ordersPipeline(): RunletPipelineRegistration =
+        RunletPipelineRegistration("orders") {
+            Runlet("orders") {
+                source(orderSource)
+                    .checkpoint(orderCheckpointStore)
+                    .map(::summarize)
+                    .sink(orderSink)
+            }
+        }
+}
+```
+
+Useful properties:
+
+```properties
+runlet.enabled=true
+runlet.threads=4
+runlet.shutdown-timeout=30s
+```
 
 ## Development
 
