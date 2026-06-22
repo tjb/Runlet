@@ -22,6 +22,7 @@ Current v0 scope:
 - one source, one linear pipeline, one sink
 - chunked execution with `Chunk<T>`
 - `map`, `filter`, and `evalMap`
+- source factories for common chunked and cursor-paged sources
 - bounded channels for uncheckpointed pipelines
 - serial checkpointed execution for ordered, resumable sources
 - file line source, file checkpoint store, and chunk-file sink
@@ -186,6 +187,32 @@ Strong production shapes for Runlet:
 These shapes describe where the model fits. Today, only file and Jackson JSONL
 connectors are implemented; database, object storage, API, and search
 connectors would live in separate optional modules.
+
+For custom production sources, start with the source factories instead of
+implementing `SourceReader` directly. A database backfill can be expressed as
+"read the next page after this cursor":
+
+```kotlin
+import org.aetherlink.runlet.api.CheckpointableSources
+import org.aetherlink.runlet.connector.file.FileCheckpointStore
+import org.aetherlink.runlet.dsl.Runlet
+
+val source =
+    CheckpointableSources.byLongCursor(
+        chunkSize = 500,
+        read = { afterId, limit ->
+            orderDao.fetchOrdersAfter(id = afterId, limit = limit)
+        },
+        cursorOf = { order -> order.id },
+    )
+
+Runlet("orders-search-backfill") {
+    source(source)
+        .checkpoint(FileCheckpointStore("state/orders-search-backfill.ckpt"))
+        .map(::toSearchDocument)
+        .sink(searchIndexSink)
+}
+```
 
 ## Spring Boot
 
