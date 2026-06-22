@@ -188,9 +188,20 @@ These shapes describe where the model fits. Today, only file and Jackson JSONL
 connectors are implemented; database, object storage, API, and search
 connectors would live in separate optional modules.
 
-For custom production sources, start with the source factories instead of
-implementing `SourceReader` directly. A database backfill can be expressed as
-"read the next page after this cursor":
+## Custom Sources
+
+Most application code should not implement `SourceReader` directly. Use the
+highest-level API that fits:
+
+| Need | Use |
+| --- | --- |
+| Built-in file or JSONL processing | `FileSource`, `JacksonFileSource`, and the matching sinks |
+| App-specific non-checkpointed reads | `Sources.records(...)` or `Sources.chunks(...)` |
+| App-specific resumable reads | `CheckpointableSources.byLongCursor(...)` or `CheckpointableSources.chunks(...)` |
+| Reusable connector modules | Implement `Source`, `CheckpointableSource`, `Sink`, or `CheckpointStore` |
+
+For example, a database backfill can be expressed as "read the next page after
+this cursor" without writing a custom reader class:
 
 ```kotlin
 import org.aetherlink.runlet.api.CheckpointableSources
@@ -213,6 +224,9 @@ Runlet("orders-search-backfill") {
         .sink(searchIndexSink)
 }
 ```
+
+The low-level reader interfaces are still public because connector modules need
+them, but they are not the ergonomic starting point for application pipelines.
 
 ## Spring Boot
 
