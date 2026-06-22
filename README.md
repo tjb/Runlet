@@ -48,6 +48,7 @@ Not implemented yet:
 | `runlet-adapter-spring` | Spring Framework `SmartLifecycle` integration. |
 | `runlet-spring-boot-autoconfigure` | Spring Boot autoconfiguration. |
 | `runlet-spring-boot-starter` | Convenience dependency for Spring Boot applications. |
+| `runlet-sample-spring-boot` | Runnable Spring Boot sample application. |
 
 ## Install
 
@@ -83,6 +84,9 @@ dependencies {
     implementation("org.aetherlink:runlet-connector-jackson:1.0-SNAPSHOT")
 }
 ```
+
+A runnable Spring Boot sample lives in
+[`runlet-sample-spring-boot`](runlet-sample-spring-boot/README.md).
 
 ## Quick Start
 

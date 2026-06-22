@@ -1,0 +1,15 @@
+runlet:
+  enabled: true
+  threads: 2
+  shutdown-timeout: 10s
+  health:
+    enabled: true
+  runtime:
+    channel-capacity: 4
+
+sample:
+  orders:
+    input: build/runlet-sample/input/orders.jsonl
+    checkpoint: build/runlet-sample/state/orders.ckpt
+    output: build/runlet-sample/output/order-summaries
+    chunk-size: 2
