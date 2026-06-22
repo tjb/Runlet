@@ -237,6 +237,7 @@ and starts/stops pipelines with the application context.
 ```kotlin
 import org.aetherlink.runlet.adapter.spring.boot.RunletPipelineRegistration
 import org.aetherlink.runlet.api.RunletRuntimeConfig
+import org.aetherlink.runlet.connector.file.FileCheckpointStore
 import org.aetherlink.runlet.dsl.Runlet
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -244,7 +245,14 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class PipelineConfiguration {
     @Bean
-    fun ordersPipeline(runletRuntimeConfig: RunletRuntimeConfig): RunletPipelineRegistration =
+    fun orderCheckpointStore(): FileCheckpointStore =
+        FileCheckpointStore("state/orders.ckpt")
+
+    @Bean
+    fun ordersPipeline(
+        runletRuntimeConfig: RunletRuntimeConfig,
+        orderCheckpointStore: FileCheckpointStore,
+    ): RunletPipelineRegistration =
         RunletPipelineRegistration("orders") {
             Runlet("orders", config = runletRuntimeConfig) {
                 source(orderSource)
@@ -255,6 +263,16 @@ class PipelineConfiguration {
         }
 }
 ```
+
+`RunletRuntimeConfig` is auto-configured by the starter from
+`runlet.runtime.*`. Today it controls the bounded channel capacity used by
+uncheckpointed pipelines. You can inject it into `Runlet(...)` as shown above or
+construct your own config manually outside Spring Boot.
+
+`orderCheckpointStore` is application-owned checkpoint storage. The example uses
+`FileCheckpointStore`, which persists the last completed cursor to
+`state/orders.ckpt`. In production, put that file on durable storage or provide
+your own `CheckpointStore` backed by a database or object storage.
 
 `application.yml`:
 
