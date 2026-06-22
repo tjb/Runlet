@@ -417,6 +417,7 @@ Useful tasks:
 
 - [Design notes](docs/design.md)
 - [Failure semantics](docs/failure-semantics.md)
+- [Replayable sync job example](docs/replayable-sync-job.md)
 
 ## Non-Goals
 
