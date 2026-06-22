@@ -5,7 +5,9 @@ import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
+import org.aetherlink.runlet.api.PipelineObserver
 import org.aetherlink.runlet.api.RunletRuntimeConfig
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -35,9 +37,13 @@ class RunletAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    fun runletRuntimeConfig(properties: RunletProperties): RunletRuntimeConfig =
+    fun runletRuntimeConfig(
+        properties: RunletProperties,
+        observers: ObjectProvider<PipelineObserver>,
+    ): RunletRuntimeConfig =
         RunletRuntimeConfig(
             channelCapacity = properties.runtime.channelCapacity,
+            observer = CompositePipelineObserver.of(observers.toList()),
         )
 
     @Bean
@@ -80,4 +86,43 @@ private class RunletThreadFactory : ThreadFactory {
     private val counter = AtomicInteger(0)
 
     override fun newThread(runnable: Runnable): Thread = Thread(runnable, "runlet-pipeline-${counter.incrementAndGet()}")
+}
+
+private class CompositePipelineObserver(
+    private val observers: List<PipelineObserver>,
+) : PipelineObserver {
+    override fun onPipelineStarted(name: String) {
+        observers.forEach { observer -> observer.onPipelineStarted(name) }
+    }
+
+    override fun onPipelineCompleted(name: String) {
+        observers.forEach { observer -> observer.onPipelineCompleted(name) }
+    }
+
+    override fun onPipelineStopped(name: String) {
+        observers.forEach { observer -> observer.onPipelineStopped(name) }
+    }
+
+    override fun onPipelineFailed(
+        name: String,
+        failure: Throwable,
+    ) {
+        observers.forEach { observer -> observer.onPipelineFailed(name, failure) }
+    }
+
+    override fun onChunkCommitted(
+        name: String,
+        records: Int,
+    ) {
+        observers.forEach { observer -> observer.onChunkCommitted(name, records) }
+    }
+
+    companion object {
+        fun of(observers: List<PipelineObserver>): PipelineObserver =
+            when (observers.size) {
+                0 -> PipelineObserver.None
+                1 -> observers.single()
+                else -> CompositePipelineObserver(observers)
+            }
+    }
 }

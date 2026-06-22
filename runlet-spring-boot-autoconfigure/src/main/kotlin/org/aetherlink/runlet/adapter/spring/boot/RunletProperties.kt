@@ -20,9 +20,15 @@ class RunletProperties {
 
     var health: Health = Health()
 
+    var metrics: Metrics = Metrics()
+
     var runtime: Runtime = Runtime()
 
     class Health {
+        var enabled: Boolean = true
+    }
+
+    class Metrics {
         var enabled: Boolean = true
     }
 

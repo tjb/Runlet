@@ -1,2 +1,3 @@
 org.aetherlink.runlet.adapter.spring.boot.RunletAutoConfiguration
 org.aetherlink.runlet.adapter.spring.boot.RunletHealthAutoConfiguration
+org.aetherlink.runlet.adapter.spring.boot.RunletMetricsAutoConfiguration

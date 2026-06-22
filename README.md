@@ -29,6 +29,7 @@ Current v0 scope:
 - blocking adapters for Java and other blocking JVM integrations
 - Spring `SmartLifecycle` adapter
 - Spring Boot starter and autoconfiguration
+- optional Micrometer metrics integration for Spring Boot apps
 
 Not implemented yet:
 
@@ -36,7 +37,6 @@ Not implemented yet:
 - event-time semantics or watermarks
 - exactly-once semantics
 - distributed execution
-- Actuator metrics integration
 
 ## Modules
 
@@ -287,6 +287,8 @@ runlet:
   shutdown-timeout: 30s
   health:
     enabled: true
+  metrics:
+    enabled: true
   runtime:
     channel-capacity: 4
 ```
@@ -297,6 +299,24 @@ are still chosen when constructing that source.
 When Spring Boot's health module is on the classpath, Runlet contributes a
 `runletHealthIndicator`. It reports `UP` when registered pipelines have no
 recorded failure and `DOWN` when one or more pipelines fail.
+
+When Micrometer is on the classpath and a `MeterRegistry` bean exists, Runlet
+also contributes a pipeline metrics observer. Actuator-enabled Spring Boot apps
+typically provide that registry. Metrics can be disabled with
+`runlet.metrics.enabled=false`.
+
+Published meters include:
+
+| Meter | Type | Tags | Meaning |
+| --- | --- | --- | --- |
+| `runlet.pipeline.starts` | counter | `pipeline` | Pipeline run starts. |
+| `runlet.pipeline.completions` | counter | `pipeline` | Pipeline run completions. |
+| `runlet.pipeline.failures` | counter | `pipeline`, `exception` | Pipeline run failures. |
+| `runlet.pipeline.chunks` | counter | `pipeline` | Chunks committed after successful sink commit. |
+| `runlet.pipeline.records` | counter | `pipeline` | Records committed after successful sink commit. |
+| `runlet.pipeline.running` | gauge | `pipeline` | `1` while a pipeline is running, otherwise `0`. |
+| `runlet.pipeline.last.success.epoch.seconds` | gauge | `pipeline` | Last successful completion time. |
+| `runlet.pipeline.last.failure.epoch.seconds` | gauge | `pipeline` | Last failure time. |
 
 ## Runtime Model
 

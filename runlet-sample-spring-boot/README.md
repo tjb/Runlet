@@ -10,6 +10,7 @@ It demonstrates:
 - `application.yml` configuration for Runlet worker threads and runtime buffers
 - an application-owned `CheckpointStore`
 - Jackson JSON Lines source and sink connectors
+- optional Micrometer metrics through Spring Boot Actuator
 
 Run it with:
 

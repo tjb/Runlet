@@ -8,7 +8,7 @@ class RunletBuilder internal constructor(
     val name: String,
     private val config: RunletRuntimeConfig,
 ) {
-    fun <T> source(source: Source<T>): Pipeline<T> = Pipeline(source, config = config)
+    fun <T> source(source: Source<T>): Pipeline<T> = Pipeline(name, source, config = config)
 
-    fun <T> source(source: CheckpointableSource<T>): CheckpointablePipeline<T> = CheckpointablePipeline(source)
+    fun <T> source(source: CheckpointableSource<T>): CheckpointablePipeline<T> = CheckpointablePipeline(name, source, config = config)
 }

@@ -1,5 +1,7 @@
 package org.aetherlink.runlet.adapter.spring.boot
 
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
@@ -8,6 +10,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
+import org.aetherlink.runlet.api.PipelineObserver
 import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.aetherlink.runlet.api.RunnablePipeline
 import org.springframework.boot.autoconfigure.AutoConfigurations
@@ -31,6 +34,7 @@ class RunletAutoConfigurationTest {
                 AutoConfigurations.of(
                     RunletAutoConfiguration::class.java,
                     RunletHealthAutoConfiguration::class.java,
+                    RunletMetricsAutoConfiguration::class.java,
                 ),
             )
 
@@ -62,6 +66,87 @@ class RunletAutoConfigurationTest {
             .run { context ->
                 assertEquals(99, context.getBean(RunletRuntimeConfig::class.java).channelCapacity)
             }
+    }
+
+    @Test
+    fun `metrics observer is created when meter registry is available`() {
+        contextRunner
+            .withBean(MeterRegistry::class.java, Supplier { SimpleMeterRegistry() })
+            .run { context ->
+                assertNotNull(context.getBean("runletMetricsObserver", PipelineObserver::class.java))
+            }
+    }
+
+    @Test
+    fun `metrics observer backs off when disabled`() {
+        contextRunner
+            .withBean(MeterRegistry::class.java, Supplier { SimpleMeterRegistry() })
+            .withPropertyValues("runlet.metrics.enabled=false")
+            .run { context ->
+                assertFalse(context.containsBean("runletMetricsObserver"))
+            }
+    }
+
+    @Test
+    fun `micrometer observer records pipeline metrics`() {
+        val registry = SimpleMeterRegistry()
+        val observer =
+            MicrometerRunletMetrics(registry, java.time.Clock.fixed(java.time.Instant.ofEpochSecond(42), java.time.ZoneOffset.UTC))
+
+        observer.onPipelineStarted("orders")
+        observer.onChunkCommitted("orders", records = 3)
+        observer.onPipelineCompleted("orders")
+        observer.onPipelineStarted("orders")
+        observer.onPipelineStopped("orders")
+
+        assertEquals(
+            2.0,
+            registry
+                .get("runlet.pipeline.starts")
+                .tag("pipeline", "orders")
+                .counter()
+                .count(),
+        )
+        assertEquals(
+            1.0,
+            registry
+                .get("runlet.pipeline.chunks")
+                .tag("pipeline", "orders")
+                .counter()
+                .count(),
+        )
+        assertEquals(
+            3.0,
+            registry
+                .get("runlet.pipeline.records")
+                .tag("pipeline", "orders")
+                .counter()
+                .count(),
+        )
+        assertEquals(
+            1.0,
+            registry
+                .get("runlet.pipeline.completions")
+                .tag("pipeline", "orders")
+                .counter()
+                .count(),
+        )
+        assertEquals(
+            0.0,
+            registry
+                .get("runlet.pipeline.running")
+                .tag("pipeline", "orders")
+                .gauge()
+                .value(),
+        )
+        assertEquals(
+            42.0,
+            registry
+                .get("runlet.pipeline.last.success.epoch.seconds")
+                .tag("pipeline", "orders")
+                .gauge()
+                .value(),
+        )
     }
 
     @Test

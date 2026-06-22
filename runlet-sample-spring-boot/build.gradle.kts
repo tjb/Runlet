@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":runlet-spring-boot-starter"))
     implementation(project(":runlet-connector-jackson"))
 
+    implementation("org.springframework.boot:spring-boot-starter-actuator:4.0.0")
     implementation("org.springframework.boot:spring-boot-starter:4.0.0")
 
     testImplementation(kotlin("test"))

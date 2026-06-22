@@ -6,6 +6,8 @@ import org.aetherlink.runlet.api.CheckpointableSource
 import org.aetherlink.runlet.api.Chunk
 import org.aetherlink.runlet.api.Cursor
 import org.aetherlink.runlet.api.CursorRange
+import org.aetherlink.runlet.api.PipelineObserver
+import org.aetherlink.runlet.api.RunletRuntimeConfig
 import org.aetherlink.runlet.api.Sink
 import org.aetherlink.runlet.api.SourceChunk
 import org.aetherlink.runlet.api.SourceReader
@@ -81,6 +83,29 @@ class CheckpointedPipelineTest {
                     "persist:1",
                 ),
                 events,
+            )
+        }
+
+    @Test
+    fun `observer sees started committed chunks and completed`() =
+        runBlocking {
+            val observer = RecordingObserver()
+
+            Runlet("test", RunletRuntimeConfig(observer = observer)) {
+                source(ScriptedCheckpointableSource(listOf("a", "b", "c"), chunkSize = 2))
+                    .checkpoint(InMemoryCheckpointStore())
+                    .filter { it != "b" }
+                    .sink(CollectingSink())
+            }.run()
+
+            assertEquals(
+                listOf(
+                    "started:test",
+                    "chunk:test:1",
+                    "chunk:test:1",
+                    "completed:test",
+                ),
+                observer.events,
             )
         }
 
@@ -174,6 +199,25 @@ class CheckpointedPipelineTest {
 
         override suspend fun commit() {
             if (failOnCommit) error("commit failed")
+        }
+    }
+
+    private class RecordingObserver : PipelineObserver {
+        val events = mutableListOf<String>()
+
+        override fun onPipelineStarted(name: String) {
+            events += "started:$name"
+        }
+
+        override fun onPipelineCompleted(name: String) {
+            events += "completed:$name"
+        }
+
+        override fun onChunkCommitted(
+            name: String,
+            records: Int,
+        ) {
+            events += "chunk:$name:$records"
         }
     }
 

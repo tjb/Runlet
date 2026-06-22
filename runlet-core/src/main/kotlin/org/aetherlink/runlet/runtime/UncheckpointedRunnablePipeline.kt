@@ -9,6 +9,7 @@ import org.aetherlink.runlet.api.Sink
 import org.aetherlink.runlet.api.Source
 
 internal class UncheckpointedRunnablePipeline(
+    private val name: String,
     private val source: Source<*>,
     private val stages: List<PipelineStage>,
     private val sink: Sink<*>,
@@ -64,6 +65,7 @@ internal class UncheckpointedRunnablePipeline(
             for (chunk in input) {
                 typedSink.write(chunk)
                 typedSink.commit()
+                config.observer.onChunkCommitted(name, chunk.records.size)
             }
         }
 

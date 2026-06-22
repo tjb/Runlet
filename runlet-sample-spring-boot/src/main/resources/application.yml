@@ -4,6 +4,8 @@ runlet:
   shutdown-timeout: 10s
   health:
     enabled: true
+  metrics:
+    enabled: true
   runtime:
     channel-capacity: 4
 
