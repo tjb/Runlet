@@ -5,7 +5,8 @@ import kotlinx.coroutines.withContext
 import org.aetherlink.runlet.api.Chunk
 import org.aetherlink.runlet.api.CursorRange
 import org.aetherlink.runlet.api.CursorRangeSink
-import org.aetherlink.runlet.internal.fsync
+import org.aetherlink.runlet.internal.fsyncDirectory
+import org.aetherlink.runlet.internal.fsyncFile
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -69,14 +70,14 @@ class ChunkFileSink<T> private constructor(
     override suspend fun commit() {
         val write = pending ?: return
         withContext(Dispatchers.IO) {
-            fsync(write.tempPath)
+            fsyncFile(write.tempPath)
             Files.move(
                 write.tempPath,
                 write.finalPath,
                 StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING,
             )
-            fsync(directory)
+            fsyncDirectory(directory)
             pending = null
         }
     }

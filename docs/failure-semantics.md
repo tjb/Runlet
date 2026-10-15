@@ -103,9 +103,11 @@ If a checkpoint store reports success before the cursor is durable, a crash can
 silently resume from an older cursor and replay more work than the caller
 expects.
 
-`FileCheckpointStore` uses a temp-write and atomic replace pattern. It also
-attempts filesystem syncs, but exact durability depends on the filesystem and
-operating system.
+`FileCheckpointStore` uses a temp-write and atomic replace pattern. It syncs the
+temp file before the rename, and `persist()` fails if that sync fails. Syncing
+the parent directory after the rename is best-effort, because some platforms
+cannot sync directories. Exact durability still depends on the filesystem and
+operating system. `ChunkFileSink.commit()` follows the same rules.
 
 ## Append Sinks Can Duplicate
 
