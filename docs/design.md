@@ -727,7 +727,7 @@ different ask than "rewrite your service in Kotlin."
 
 ### Virtual threads (Java 21+), and why they fit Runlet well
 
-A common worry: "Kotlin uses coroutines, Java 25 has virtual threads —
+A common worry: "Kotlin uses coroutines, Java 21 has virtual threads —
 do these conflict?" They don't. Coroutines and virtual threads are two
 solutions to the same problem (cheap concurrency without OS-thread cost)
 at different layers, and they compose rather than compete — coroutines
