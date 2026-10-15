@@ -390,7 +390,10 @@ class ConsoleBlockingSink : BlockingSink<String> {
 val sink = ConsoleBlockingSink().asSink()
 ```
 
-Blocking adapter calls run on `Dispatchers.IO`.
+Blocking adapter calls run on `Dispatchers.IO`. Cancelling the pipeline cancels
+the work inside a blocking source's reader scope, so the source's `useReader`
+cleanup runs. Runlet does not interrupt threads: a blocking call that is already
+running finishes before cancellation takes effect.
 
 ## Spring Framework
 
