@@ -29,7 +29,9 @@ class RunletPipelineManager(
         }
     }
 
-    override fun isRunning(): Boolean = running && registry.lifecycles().all { it.isRunning }
+    // Reports the manager's own lifecycle state. Tying it to every pipeline still
+    // running would make Spring skip stop() once any batch pipeline completes.
+    override fun isRunning(): Boolean = running
 
     override fun isAutoStartup(): Boolean = true
 }
