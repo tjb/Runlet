@@ -42,7 +42,7 @@ class ChunkFileSink<T> private constructor(
                 if (cursorRange == null) {
                     val index = nextChunkIndex()
                     claimedIndex = index
-                    "chunk-${index.toString().padStart(13, '0')}.jsonl"
+                    indexedChunkFileName(index)
                 } else {
                     "chunk-${cursorRange.start.value.toString().padStart(
                         13,
@@ -89,9 +89,14 @@ class ChunkFileSink<T> private constructor(
 
     private fun nextChunkIndex(): Long {
         if (pending != null) error("Previous chunk must be committed before writing another")
-        // Scanning once per sink keeps indexed writes from listing the directory per chunk.
-        return nextIndex ?: scanNextChunkIndex()
+        // Reusing the in-memory index avoids listing the directory per chunk. Rescan if
+        // another sink has already written that file, so its chunk is never overwritten.
+        val cached = nextIndex
+        if (cached != null && !Files.exists(directory.resolve(indexedChunkFileName(cached)))) return cached
+        return scanNextChunkIndex()
     }
+
+    private fun indexedChunkFileName(index: Long): String = "chunk-${index.toString().padStart(13, '0')}.jsonl"
 
     private fun scanNextChunkIndex(): Long {
         if (!Files.exists(directory)) return 0L
