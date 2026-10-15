@@ -55,4 +55,26 @@ class ChunkFileSinkTest {
             )
             assertEquals("c\n", directory.resolve("chunk-0000000000002.jsonl").readText())
         }
+
+    @Test
+    fun `interleaved sinks on one directory do not overwrite each other`() =
+        runBlocking {
+            val directory = createTempDirectory("runlet-chunks")
+            val first = ChunkFileSink.lines(directory)
+            val second = ChunkFileSink.lines(directory)
+
+            first.write(Chunk(listOf("a1")))
+            first.commit()
+            second.write(Chunk(listOf("b1")))
+            second.commit()
+            first.write(Chunk(listOf("a2")))
+            first.commit()
+
+            val contents =
+                directory
+                    .listDirectoryEntries()
+                    .sortedBy { it.name }
+                    .map { it.readText() }
+            assertEquals(listOf("a1\n", "b1\n", "a2\n"), contents)
+        }
 }
