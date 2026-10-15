@@ -18,6 +18,7 @@ class ChunkFileSink<T> private constructor(
     private val encode: (T) -> String,
 ) : CursorRangeSink<T> {
     private var pending: PendingWrite? = null
+    private var nextIndex: Long? = null
 
     override suspend fun write(chunk: Chunk<T>) {
         writePending(chunk, cursorRange = null)
@@ -36,9 +37,12 @@ class ChunkFileSink<T> private constructor(
     ) {
         withContext(Dispatchers.IO) {
             Files.createDirectories(directory)
+            var claimedIndex: Long? = null
             val fileName =
                 if (cursorRange == null) {
-                    "chunk-${nextChunkIndex().toString().padStart(13, '0')}.jsonl"
+                    val index = nextChunkIndex()
+                    claimedIndex = index
+                    "chunk-${index.toString().padStart(13, '0')}.jsonl"
                 } else {
                     "chunk-${cursorRange.start.value.toString().padStart(
                         13,
@@ -64,6 +68,7 @@ class ChunkFileSink<T> private constructor(
                 StandardOpenOption.WRITE,
             )
             pending = PendingWrite(tempPath, finalPath)
+            claimedIndex?.let { index -> nextIndex = index + 1 }
         }
     }
 
@@ -84,11 +89,16 @@ class ChunkFileSink<T> private constructor(
 
     private fun nextChunkIndex(): Long {
         if (pending != null) error("Previous chunk must be committed before writing another")
+        // Scanning once per sink keeps indexed writes from listing the directory per chunk.
+        return nextIndex ?: scanNextChunkIndex()
+    }
+
+    private fun scanNextChunkIndex(): Long {
         if (!Files.exists(directory)) return 0L
         return Files.list(directory).use { stream ->
             stream
                 .map { it.fileName.toString() }
-                .filter { it.matches(Regex("""chunk-\d{13}\.jsonl""")) }
+                .filter { it.matches(INDEXED_CHUNK_FILE_NAME) }
                 .mapToLong { name -> name.removePrefix("chunk-").removeSuffix(".jsonl").toLongOrNull() ?: -1L }
                 .max()
                 .orElse(-1L) + 1L
@@ -101,6 +111,8 @@ class ChunkFileSink<T> private constructor(
     )
 
     companion object {
+        private val INDEXED_CHUNK_FILE_NAME = Regex("""chunk-\d{13}\.jsonl""")
+
         fun lines(directory: String): ChunkFileSink<String> = lines(Path.of(directory))
 
         fun lines(directory: Path): ChunkFileSink<String> = ChunkFileSink(directory) { it }
