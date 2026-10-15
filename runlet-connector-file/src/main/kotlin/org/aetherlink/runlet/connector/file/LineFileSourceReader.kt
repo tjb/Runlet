@@ -7,7 +7,6 @@ import org.aetherlink.runlet.api.Cursor
 import org.aetherlink.runlet.api.CursorRange
 import org.aetherlink.runlet.api.SourceChunk
 import org.aetherlink.runlet.api.SourceReader
-import java.io.BufferedInputStream
 import java.io.Closeable
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -17,14 +16,28 @@ internal class LineFileSourceReader(
     path: Path,
     cursor: Cursor,
     private val chunkSize: Int,
+    bufferSize: Int = READ_BUFFER_SIZE,
 ) : SourceReader<SourceChunk<String>>,
     Closeable {
-    private val input = BufferedInputStream(Files.newInputStream(path))
+    init {
+        require(bufferSize > 0) { "bufferSize must be positive" }
+    }
+
+    private val input = Files.newInputStream(path)
+    private val buffer = ByteArray(bufferSize)
+    private var bufferPosition = 0
+    private var bufferLimit = 0
+    private var lineBytes = ByteArray(INITIAL_LINE_CAPACITY)
     private var position = 0L
     private var closed = false
 
     init {
-        skipFully(cursor.value)
+        try {
+            skipFully(cursor.value)
+        } catch (failure: Throwable) {
+            input.close()
+            throw failure
+        }
         position = cursor.value
     }
 
@@ -65,20 +78,82 @@ internal class LineFileSourceReader(
         }
     }
 
+    /*
+     * Lines are scanned in the read buffer and decoded once, so multi-byte UTF-8
+     * characters split across buffer refills stay intact. `position` counts every
+     * consumed byte, including the newline, because it becomes the resume cursor.
+     */
     private fun readLineUtf8(): String? {
-        val bytes = ArrayList<Byte>()
+        var lineLength = 0
         while (true) {
-            val next = input.read()
-            if (next == -1) {
-                if (bytes.isEmpty()) return null
-                return bytes.toByteArray().toString(StandardCharsets.UTF_8)
+            if (bufferPosition == bufferLimit && !fillBuffer()) {
+                return if (lineLength == 0) null else String(lineBytes, 0, lineLength, StandardCharsets.UTF_8)
             }
 
-            position += 1
-            if (next == '\n'.code) {
-                return bytes.toByteArray().toString(StandardCharsets.UTF_8).removeSuffix("\r")
+            val newline = indexOfNewline()
+            val end = if (newline == -1) bufferLimit else newline
+            val segmentLength = end - bufferPosition
+            position += segmentLength
+
+            if (newline != -1 && lineLength == 0) {
+                val line = decodeLine(buffer, bufferPosition, segmentLength)
+                bufferPosition = newline + 1
+                position += 1
+                return line
             }
-            bytes += next.toByte()
+
+            appendToLine(lineLength, segmentLength)
+            lineLength += segmentLength
+            bufferPosition = end
+
+            if (newline != -1) {
+                bufferPosition += 1
+                position += 1
+                return decodeLine(lineBytes, 0, lineLength)
+            }
         }
+    }
+
+    private fun fillBuffer(): Boolean {
+        val read = input.read(buffer)
+        if (read == -1) return false
+        bufferPosition = 0
+        bufferLimit = read
+        return true
+    }
+
+    private fun indexOfNewline(): Int {
+        for (index in bufferPosition until bufferLimit) {
+            if (buffer[index] == NEWLINE) return index
+        }
+        return -1
+    }
+
+    private fun appendToLine(
+        lineLength: Int,
+        count: Int,
+    ) {
+        val required = lineLength + count
+        if (required > lineBytes.size) {
+            lineBytes = lineBytes.copyOf(maxOf(required, lineBytes.size * 2))
+        }
+        System.arraycopy(buffer, bufferPosition, lineBytes, lineLength, count)
+    }
+
+    private fun decodeLine(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ): String {
+        val withoutCarriageReturn =
+            if (length > 0 && bytes[offset + length - 1] == CARRIAGE_RETURN) length - 1 else length
+        return String(bytes, offset, withoutCarriageReturn, StandardCharsets.UTF_8)
+    }
+
+    private companion object {
+        const val READ_BUFFER_SIZE = 64 * 1024
+        const val INITIAL_LINE_CAPACITY = 256
+        const val NEWLINE = '\n'.code.toByte()
+        const val CARRIAGE_RETURN = '\r'.code.toByte()
     }
 }
