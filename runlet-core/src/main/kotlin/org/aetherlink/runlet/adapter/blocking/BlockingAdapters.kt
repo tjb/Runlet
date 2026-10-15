@@ -1,6 +1,7 @@
 package org.aetherlink.runlet.adapter.blocking
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.aetherlink.runlet.api.CheckpointableSource
@@ -38,10 +39,12 @@ private class BlockingSourceAdapter<T>(
 ) : Source<T> {
     override suspend fun <R> useReader(block: suspend SourceReader<Chunk<T>>.() -> R): R =
         withContext(Dispatchers.IO) {
+            val caller = coroutineContext.job
             delegate.useReader { reader ->
                 // The blocking source owns reader lifetime synchronously; runBlocking
                 // is the bridge that lets Runlet execute its suspend reader block inside it.
-                runBlocking {
+                // Parenting it to the caller's job lets pipeline cancellation reach the block.
+                runBlocking(caller) {
                     block(BlockingSourceReaderAdapter(reader))
                 }
             }
@@ -56,8 +59,9 @@ private class BlockingCheckpointableSourceAdapter<T>(
         block: suspend SourceReader<SourceChunk<T>>.() -> R,
     ): R =
         withContext(Dispatchers.IO) {
+            val caller = coroutineContext.job
             delegate.useReader(cursor) { reader ->
-                runBlocking {
+                runBlocking(caller) {
                     block(BlockingSourceReaderAdapter(reader))
                 }
             }
