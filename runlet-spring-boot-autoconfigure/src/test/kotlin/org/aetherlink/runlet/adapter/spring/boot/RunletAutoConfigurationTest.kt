@@ -254,6 +254,36 @@ class RunletAutoConfigurationTest {
     }
 
     @Test
+    fun `context close stops running pipelines after another pipeline completed`() {
+        val streaming = BlockingPipeline()
+        val runner =
+            contextRunner
+                .withBean(
+                    "batchPipeline",
+                    RunletPipelineRegistration::class.java,
+                    Supplier {
+                        RunletPipelineRegistration("batch") { CompletedPipeline }
+                    },
+                ).withBean(
+                    "streamingPipeline",
+                    RunletPipelineRegistration::class.java,
+                    Supplier {
+                        RunletPipelineRegistration("streaming") { streaming }
+                    },
+                )
+
+        runner.run { context ->
+            val registry = context.getBean(RunletPipelineRegistry::class.java)
+            runBlocking { streaming.started.await() }
+            awaitUntil { registry.lifecycle("batch")?.isRunning == false }
+
+            context.close()
+
+            assertTrue(streaming.cancelled.isCompleted)
+        }
+    }
+
+    @Test
     fun `registry reports registered pipeline failures`() {
         val failure = IllegalStateException("pipeline failed")
         val runner =
@@ -327,6 +357,10 @@ class RunletAutoConfigurationTest {
                 cancelled.complete(true)
             }
         }
+    }
+
+    private object CompletedPipeline : RunnablePipeline {
+        override suspend fun run() = Unit
     }
 
     private class FailingPipeline(
