@@ -2,12 +2,16 @@ package org.aetherlink.runlet.connector.file
 
 import kotlinx.coroutines.runBlocking
 import org.aetherlink.runlet.api.Cursor
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempFile
 import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class LineFileSourceReaderTest {
     private val content =
@@ -53,6 +57,37 @@ class LineFileSourceReaderTest {
                 }
             }
         }
+
+    @Test
+    fun `resuming past the end of the file fails`() {
+        val file = createTempFile("runlet-lines", ".txt")
+        file.writeBytes(content)
+
+        val failure =
+            assertFailsWith<IllegalStateException> {
+                LineFileSourceReader(file, Cursor(content.size + 1L), chunkSize = 1)
+            }
+
+        assertEquals("Could not resume ${content.size + 1} bytes into source", failure.message)
+    }
+
+    @Test
+    fun `failed resume closes the file`() {
+        val descriptors = Path.of("/proc/self/fd")
+        assumeTrue(Files.isDirectory(descriptors), "needs /proc/self/fd to count open files")
+        val file = createTempFile("runlet-lines", ".txt")
+        file.writeBytes(content)
+        val openBefore = Files.list(descriptors).use { it.count() }
+
+        repeat(50) {
+            assertFailsWith<IllegalStateException> {
+                LineFileSourceReader(file, Cursor(content.size + 1L), chunkSize = 1)
+            }
+        }
+
+        val openAfter = Files.list(descriptors).use { it.count() }
+        assertTrue(openAfter - openBefore < 10, "open files grew from $openBefore to $openAfter")
+    }
 
     private suspend fun readLines(
         file: Path,
