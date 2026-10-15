@@ -52,6 +52,8 @@ Not implemented yet:
 
 ## Install
 
+Runlet requires Java 21 or newer.
+
 Runlet is not published to a remote Maven repository yet. For local use, publish
 the artifacts to your Maven local repository:
 
