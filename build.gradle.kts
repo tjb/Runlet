@@ -28,7 +28,7 @@ subprojects {
     }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension>("kotlin") {
-        jvmToolchain(25)
+        jvmToolchain(21)
     }
 
     tasks.withType<Test>().configureEach {
