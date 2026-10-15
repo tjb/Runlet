@@ -4,7 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aetherlink.runlet.api.CheckpointStore
 import org.aetherlink.runlet.api.Cursor
-import org.aetherlink.runlet.internal.fsync
+import org.aetherlink.runlet.internal.fsyncDirectory
+import org.aetherlink.runlet.internal.fsyncFile
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -36,9 +37,9 @@ class FileCheckpointStore(
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE,
             )
-            fsync(temp)
+            fsyncFile(temp)
             Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            path.parent?.let(::fsync)
+            path.parent?.let(::fsyncDirectory)
         }
     }
 }
