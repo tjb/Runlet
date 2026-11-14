@@ -8,6 +8,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.aetherlink.runlet.api.RunnablePipeline
+import org.apache.commons.logging.LogFactory
 import org.springframework.context.SmartLifecycle
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -27,7 +28,19 @@ class SpringPipelineLifecycle(
     private var failure: Throwable? = null
 
     override fun start() {
-        if (job?.isActive == true) return
+        val previous = job
+        if (previous?.isActive == true) return
+        // A run that failed or was cancelled may still be running its cleanup, or be
+        // stuck in a blocking call after a shutdown timeout. Starting another run now
+        // would let two runs share one source and checkpoint, so wait for it first.
+        if (previous != null && !previous.isCompleted) {
+            runBlocking {
+                withTimeoutOrNull(shutdownTimeout) { previous.join() }
+            }
+            check(previous.isCompleted) {
+                "Previous run of this pipeline is still shutting down"
+            }
+        }
 
         failure = null
         job =
@@ -46,10 +59,17 @@ class SpringPipelineLifecycle(
 
     override fun stop() {
         val current = job ?: return
-        runBlocking {
-            withTimeoutOrNull(shutdownTimeout) {
-                current.cancelAndJoin()
+        val stopped =
+            runBlocking {
+                withTimeoutOrNull(shutdownTimeout) {
+                    current.cancelAndJoin()
+                } != null
             }
+        if (!stopped) {
+            // Keep the job so isRunning stays true and start() refuses a second run
+            // until this one finishes.
+            logger.warn("Pipeline did not stop within $shutdownTimeout; it is still shutting down")
+            return
         }
         if (job === current) {
             job = null
@@ -64,11 +84,17 @@ class SpringPipelineLifecycle(
         }
     }
 
-    override fun isRunning(): Boolean = job?.isActive == true
+    // A cancelled job is no longer active but may still be running its cleanup, so
+    // report it as running until it has completed.
+    override fun isRunning(): Boolean = job?.isCompleted == false
 
     override fun isAutoStartup(): Boolean = autoStartup
 
     override fun getPhase(): Int = phase
 
     fun failure(): Throwable? = failure
+
+    private companion object {
+        private val logger = LogFactory.getLog(SpringPipelineLifecycle::class.java)
+    }
 }
