@@ -45,6 +45,7 @@ Not implemented yet:
 | `runlet-core` | Core API, DSL, runtime, and blocking adapters. |
 | `runlet-connector-file` | File source, file checkpoint store, and chunk-file sink. |
 | `runlet-connector-jackson` | Jackson-backed JSON Lines source and sink helpers. |
+| `runlet-test` | Scripted sources, recording sinks, and failure injection for pipeline tests. |
 | `runlet-adapter-spring` | Spring Framework `SmartLifecycle` integration. |
 | `runlet-spring-boot-autoconfigure` | Spring Boot autoconfiguration. |
 | `runlet-spring-boot-starter` | Convenience dependency for Spring Boot applications. |
@@ -396,6 +397,54 @@ Blocking adapter calls run on `Dispatchers.IO`. Cancelling the pipeline cancels
 the work inside a blocking source's reader scope, so the source's `useReader`
 cleanup runs. Runlet does not interrupt threads: a blocking call that is already
 running finishes before cancellation takes effect.
+
+## Testing Pipelines
+
+Add `runlet-test` as a test dependency to test pipeline logic and crash/replay
+behavior without files or timing tricks:
+
+```kotlin
+dependencies {
+    testImplementation("org.aetherlink:runlet-test:1.0-SNAPSHOT")
+}
+```
+
+It provides:
+
+| Type | Use |
+| --- | --- |
+| `ScriptedSource` | Emits a fixed list of records in chunks; tracks reader open/close. |
+| `ScriptedCheckpointableSource` | Same, using each record's index as its cursor; records where each run resumed. |
+| `RecordingSink` | Records writes, commits, and cursor ranges; a failed commit discards pending writes. |
+| `InMemoryCheckpointStore` | Keeps the cursor in memory and records every persist. |
+| `RecordingObserver` | Records pipeline lifecycle and chunk events. |
+
+Each test double has `failOn...(call)` methods that throw `InjectedFailure` on
+the given call, counted from 0. A scheduled failure fires once, so rerunning the
+pipeline against the same instances simulates a restart:
+
+```kotlin
+@Test
+fun `resumes after a failed commit`() = runBlocking {
+    val source = ScriptedCheckpointableSource(listOf("a", "b", "c", "d"), chunkSize = 2)
+    val sink = RecordingSink<String>().failOnCommit(1)
+    val checkpoint = InMemoryCheckpointStore()
+    val pipeline = Runlet("orders") {
+        source(source).checkpoint(checkpoint).sink(sink)
+    }
+
+    assertFailsWith<InjectedFailure> { pipeline.run() }
+    pipeline.run()
+
+    assertEquals(listOf(null, Cursor(2)), source.resumeCursors)
+    assertEquals(listOf("a", "b", "c", "d"), sink.committedRecords)
+    assertFalse(source.isOpen)
+}
+```
+
+Use `InMemoryCheckpointStore.failOnPersist(...)` to simulate a crash between sink
+commit and checkpoint persist, then assert on `RecordingSink.writes` to see which
+cursor ranges were replayed.
 
 ## Spring Framework
 

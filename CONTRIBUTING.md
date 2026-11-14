@@ -27,6 +27,7 @@ Useful local tasks:
 - `runlet-core`: core API, DSL, runtime, and blocking adapters.
 - `runlet-connector-file`: file source, checkpoint store, and chunk-file sink.
 - `runlet-connector-jackson`: Jackson JSON Lines helpers.
+- `runlet-test`: test doubles and failure injection for pipeline tests.
 - `runlet-adapter-spring`: Spring Framework lifecycle adapter.
 - `runlet-spring-boot-autoconfigure`: Spring Boot autoconfiguration.
 - `runlet-spring-boot-starter`: convenience starter dependency.
