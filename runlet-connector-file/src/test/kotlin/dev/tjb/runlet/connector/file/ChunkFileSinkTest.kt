@@ -1,0 +1,80 @@
+package dev.tjb.runlet.connector.file
+
+import dev.tjb.runlet.api.Chunk
+import dev.tjb.runlet.api.Cursor
+import dev.tjb.runlet.api.CursorRange
+import kotlinx.coroutines.runBlocking
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import kotlin.io.path.readText
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class ChunkFileSinkTest {
+    @Test
+    fun `chunk file sink overwrites replayed cursor range`() =
+        runBlocking {
+            val directory = createTempDirectory("runlet-chunks")
+            val sink = ChunkFileSink.lines(directory)
+            val range = CursorRange(Cursor(0), Cursor(4))
+
+            sink.write(Chunk(listOf("old")), range)
+            sink.commit()
+            sink.write(Chunk(listOf("new")), range)
+            sink.commit()
+
+            val output = directory.resolve("chunk-0000000000000-0000000000004.jsonl")
+            assertTrue(output.toFile().exists())
+            assertEquals("new\n", output.readText())
+        }
+
+    @Test
+    fun `indexed chunks are numbered sequentially across sink instances`() =
+        runBlocking {
+            val directory = createTempDirectory("runlet-chunks")
+            val first = ChunkFileSink.lines(directory)
+
+            first.write(Chunk(listOf("a")))
+            first.commit()
+            first.write(Chunk(listOf("b")))
+            first.commit()
+
+            val second = ChunkFileSink.lines(directory)
+            second.write(Chunk(listOf("c")))
+            second.commit()
+
+            assertEquals(
+                listOf(
+                    "chunk-0000000000000.jsonl",
+                    "chunk-0000000000001.jsonl",
+                    "chunk-0000000000002.jsonl",
+                ),
+                directory.listDirectoryEntries().map { it.name }.sorted(),
+            )
+            assertEquals("c\n", directory.resolve("chunk-0000000000002.jsonl").readText())
+        }
+
+    @Test
+    fun `interleaved sinks on one directory do not overwrite each other`() =
+        runBlocking {
+            val directory = createTempDirectory("runlet-chunks")
+            val first = ChunkFileSink.lines(directory)
+            val second = ChunkFileSink.lines(directory)
+
+            first.write(Chunk(listOf("a1")))
+            first.commit()
+            second.write(Chunk(listOf("b1")))
+            second.commit()
+            first.write(Chunk(listOf("a2")))
+            first.commit()
+
+            val contents =
+                directory
+                    .listDirectoryEntries()
+                    .sortedBy { it.name }
+                    .map { it.readText() }
+            assertEquals(listOf("a1\n", "b1\n", "a2\n"), contents)
+        }
+}
