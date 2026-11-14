@@ -110,6 +110,33 @@ class CheckpointedPipelineTest {
         }
 
     @Test
+    fun `checkpoint is persisted before observer is notified`() =
+        runBlocking {
+            val checkpoint = InMemoryCheckpointStore()
+            val sink = CollectingSink<String>()
+            val observer =
+                object : PipelineObserver {
+                    override fun onChunkCommitted(
+                        name: String,
+                        records: Int,
+                    ) {
+                        error("observer failed")
+                    }
+                }
+
+            assertFailsWith<IllegalStateException> {
+                Runlet("test", RunletRuntimeConfig(observer = observer)) {
+                    source(ScriptedCheckpointableSource(listOf("a", "b"), chunkSize = 1))
+                        .checkpoint(checkpoint)
+                        .sink(sink)
+                }.run()
+            }
+
+            assertEquals(listOf(listOf("a")), sink.committedChunks)
+            assertEquals(Cursor(1), checkpoint.cursor)
+        }
+
+    @Test
     fun `checkpoint does not advance when sink write fails`() =
         runBlocking {
             val checkpoint = InMemoryCheckpointStore()
