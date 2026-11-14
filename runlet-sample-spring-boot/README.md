@@ -32,4 +32,4 @@ build/runlet-sample/output/order-summaries/
 ```
 
 The interesting code is in
-`src/main/kotlin/org/aetherlink/runlet/sample/spring/boot/RunletSampleApplication.kt`.
+`src/main/kotlin/dev/tjb/runlet/sample/spring/boot/RunletSampleApplication.kt`.

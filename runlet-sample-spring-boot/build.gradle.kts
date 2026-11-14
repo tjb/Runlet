@@ -16,5 +16,5 @@ dependencies {
 }
 
 application {
-    mainClass.set("org.aetherlink.runlet.sample.spring.boot.RunletSampleApplicationKt")
+    mainClass.set("dev.tjb.runlet.sample.spring.boot.RunletSampleApplicationKt")
 }

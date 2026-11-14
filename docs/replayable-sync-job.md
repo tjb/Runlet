@@ -18,9 +18,9 @@ is persisted, the next run may replay the same chunk. That is acceptable when
 the sink performs upserts keyed by a stable ID.
 
 ```kotlin
-import org.aetherlink.runlet.api.CheckpointableSources
-import org.aetherlink.runlet.connector.file.FileCheckpointStore
-import org.aetherlink.runlet.dsl.Runlet
+import dev.tjb.runlet.api.CheckpointableSources
+import dev.tjb.runlet.connector.file.FileCheckpointStore
+import dev.tjb.runlet.dsl.Runlet
 
 data class CustomerChange(
     val id: String,

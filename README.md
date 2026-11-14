@@ -72,9 +72,9 @@ repositories {
 }
 
 dependencies {
-    implementation("org.aetherlink:runlet-core:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-connector-jackson:1.0-SNAPSHOT")
+    implementation("dev.tjb:runlet-core:1.0-SNAPSHOT")
+    implementation("dev.tjb:runlet-connector-file:1.0-SNAPSHOT")
+    implementation("dev.tjb:runlet-connector-jackson:1.0-SNAPSHOT")
 }
 ```
 
@@ -82,9 +82,9 @@ For Spring Boot applications, prefer the starter:
 
 ```kotlin
 dependencies {
-    implementation("org.aetherlink:runlet-spring-boot-starter:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-connector-file:1.0-SNAPSHOT")
-    implementation("org.aetherlink:runlet-connector-jackson:1.0-SNAPSHOT")
+    implementation("dev.tjb:runlet-spring-boot-starter:1.0-SNAPSHOT")
+    implementation("dev.tjb:runlet-connector-file:1.0-SNAPSHOT")
+    implementation("dev.tjb:runlet-connector-jackson:1.0-SNAPSHOT")
 }
 ```
 
@@ -97,11 +97,11 @@ This checkpointed file pipeline reads lines from a file, keeps completed
 records, transforms them, and writes replay-safe chunk files.
 
 ```kotlin
+import dev.tjb.runlet.connector.file.ChunkFileSink
+import dev.tjb.runlet.connector.file.FileCheckpointStore
+import dev.tjb.runlet.connector.file.FileSource
+import dev.tjb.runlet.dsl.Runlet
 import kotlinx.coroutines.runBlocking
-import org.aetherlink.runlet.connector.file.ChunkFileSink
-import org.aetherlink.runlet.connector.file.FileCheckpointStore
-import org.aetherlink.runlet.connector.file.FileSource
-import org.aetherlink.runlet.dsl.Runlet
 
 fun main() = runBlocking {
     Runlet("orders") {
@@ -140,11 +140,11 @@ For example, a service can process a partner-provided JSON Lines export at
 startup or on a schedule:
 
 ```kotlin
+import dev.tjb.runlet.connector.file.FileCheckpointStore
+import dev.tjb.runlet.connector.jackson.JacksonChunkFileSink
+import dev.tjb.runlet.connector.jackson.JacksonFileSource
+import dev.tjb.runlet.dsl.Runlet
 import kotlinx.coroutines.runBlocking
-import org.aetherlink.runlet.connector.file.FileCheckpointStore
-import org.aetherlink.runlet.connector.jackson.JacksonChunkFileSink
-import org.aetherlink.runlet.connector.jackson.JacksonFileSource
-import org.aetherlink.runlet.dsl.Runlet
 
 data class PartnerOrder(
     val id: String,
@@ -211,9 +211,9 @@ For example, a database backfill can be expressed as "read the next page after
 this cursor" without writing a custom reader class:
 
 ```kotlin
-import org.aetherlink.runlet.api.CheckpointableSources
-import org.aetherlink.runlet.connector.file.FileCheckpointStore
-import org.aetherlink.runlet.dsl.Runlet
+import dev.tjb.runlet.api.CheckpointableSources
+import dev.tjb.runlet.connector.file.FileCheckpointStore
+import dev.tjb.runlet.dsl.Runlet
 
 val source =
     CheckpointableSources.byLongCursor(
@@ -242,10 +242,10 @@ creates a shared coroutine scope, wraps each registration in a `SmartLifecycle`,
 and starts/stops pipelines with the application context.
 
 ```kotlin
-import org.aetherlink.runlet.adapter.spring.boot.RunletPipelineRegistration
-import org.aetherlink.runlet.api.RunletRuntimeConfig
-import org.aetherlink.runlet.connector.file.FileCheckpointStore
-import org.aetherlink.runlet.dsl.Runlet
+import dev.tjb.runlet.adapter.spring.boot.RunletPipelineRegistration
+import dev.tjb.runlet.api.RunletRuntimeConfig
+import dev.tjb.runlet.connector.file.FileCheckpointStore
+import dev.tjb.runlet.dsl.Runlet
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -331,7 +331,7 @@ Uncheckpointed pipelines run stages concurrently with bounded channels between
 the source, stages, and sink:
 
 ```kotlin
-import org.aetherlink.runlet.api.RunletRuntimeConfig
+import dev.tjb.runlet.api.RunletRuntimeConfig
 
 Runlet(
     name = "fast-path",
@@ -367,8 +367,8 @@ val sink = ChunkFileSink.jsonLines(
 For Jackson, add `runlet-connector-jackson` and use the Jackson factories:
 
 ```kotlin
-import org.aetherlink.runlet.connector.jackson.JacksonChunkFileSink
-import org.aetherlink.runlet.connector.jackson.JacksonFileSource
+import dev.tjb.runlet.connector.jackson.JacksonChunkFileSink
+import dev.tjb.runlet.connector.jackson.JacksonFileSource
 
 val source = JacksonFileSource.jsonLines<Order>("orders.jsonl")
 val sink = JacksonChunkFileSink.jsonLines<OrderSummary>("summaries")
@@ -380,9 +380,9 @@ Java and blocking JVM integrations can implement blocking interfaces and adapt
 them into Runlet's coroutine contracts:
 
 ```kotlin
-import org.aetherlink.runlet.adapter.blocking.BlockingSink
-import org.aetherlink.runlet.adapter.blocking.asSink
-import org.aetherlink.runlet.api.Chunk
+import dev.tjb.runlet.adapter.blocking.BlockingSink
+import dev.tjb.runlet.adapter.blocking.asSink
+import dev.tjb.runlet.api.Chunk
 
 class ConsoleBlockingSink : BlockingSink<String> {
     override fun write(chunk: Chunk<String>) {
@@ -405,7 +405,7 @@ behavior without files or timing tricks:
 
 ```kotlin
 dependencies {
-    testImplementation("org.aetherlink:runlet-test:1.0-SNAPSHOT")
+    testImplementation("dev.tjb:runlet-test:1.0-SNAPSHOT")
 }
 ```
 
@@ -452,10 +452,10 @@ Applications that use Spring Framework without Spring Boot can wrap a pipeline
 as a `SmartLifecycle` bean:
 
 ```kotlin
+import dev.tjb.runlet.adapter.spring.SpringPipelineLifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
-import org.aetherlink.runlet.adapter.spring.SpringPipelineLifecycle
 import java.util.concurrent.Executors
 
 val dispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()

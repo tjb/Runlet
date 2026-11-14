@@ -5,7 +5,7 @@ plugins {
 }
 
 allprojects {
-    group = "org.aetherlink"
+    group = "dev.tjb"
     version = "1.0-SNAPSHOT"
 
     repositories {
