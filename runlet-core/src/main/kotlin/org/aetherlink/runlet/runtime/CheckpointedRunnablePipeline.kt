@@ -33,9 +33,13 @@ internal class CheckpointedRunnablePipeline(
                         typedSink.write(output)
                     }
                     typedSink.commit()
-                    config.observer.onChunkCommitted(name, output.records.size)
                 }
                 checkpointStore.persist(sourceChunk.cursorRange.next)
+                // Notify only after the checkpoint is durable, so a failing observer
+                // cannot leave an already-committed chunk to be replayed.
+                if (output != null) {
+                    config.observer.onChunkCommitted(name, output.records.size)
+                }
             }
         }
     }

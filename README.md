@@ -314,8 +314,8 @@ Published meters include:
 | `runlet.pipeline.starts` | counter | `pipeline` | Pipeline run starts. |
 | `runlet.pipeline.completions` | counter | `pipeline` | Pipeline run completions. |
 | `runlet.pipeline.failures` | counter | `pipeline`, `exception` | Pipeline run failures. |
-| `runlet.pipeline.chunks` | counter | `pipeline` | Chunks committed after successful sink commit. |
-| `runlet.pipeline.records` | counter | `pipeline` | Records committed after successful sink commit. |
+| `runlet.pipeline.chunks` | counter | `pipeline` | Chunks committed after successful sink commit (and checkpoint, for checkpointed pipelines). |
+| `runlet.pipeline.records` | counter | `pipeline` | Records committed after successful sink commit (and checkpoint, for checkpointed pipelines). |
 | `runlet.pipeline.running` | gauge | `pipeline` | `1` while a pipeline is running, otherwise `0`. |
 | `runlet.pipeline.last.success.epoch.seconds` | gauge | `pipeline` | Last successful completion time. |
 | `runlet.pipeline.last.failure.epoch.seconds` | gauge | `pipeline` | Last failure time. |
